@@ -1,0 +1,503 @@
+"use client";
+
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import {
+  useCallback,
+  useEffect,
+  useReducer,
+  useRef,
+  useState,
+} from "react";
+import {
+  PLAYBACK_RATES,
+  initialPlayerState,
+  playerReducer,
+  type PlayerState,
+} from "./state";
+
+const RATE_KEY = "gre-learn-playback-rate";
+
+function speakBrowser(
+  text: string,
+  rate: number,
+  onEnd: () => void,
+  onError: (message: string) => void,
+) {
+  if (typeof window === "undefined" || !window.speechSynthesis) {
+    onError("Speech synthesis is not available in this browser.");
+    return () => {};
+  }
+  window.speechSynthesis.cancel();
+  const utter = new SpeechSynthesisUtterance(text);
+  utter.rate = rate;
+  utter.onend = onEnd;
+  utter.onerror = () => onError("Could not speak this segment.");
+  window.speechSynthesis.speak(utter);
+  return () => {
+    window.speechSynthesis.cancel();
+  };
+}
+
+export function AudioReviewPlayer() {
+  const searchParams = useSearchParams();
+  const focusWord = searchParams.get("word");
+  const [state, dispatch] = useReducer(playerReducer, initialPlayerState);
+  const [ready, setReady] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const cancelSpeakRef = useRef<(() => void) | null>(null);
+  const stateRef = useRef(state);
+  stateRef.current = state;
+
+  useEffect(() => {
+    const saved = localStorage.getItem(RATE_KEY);
+    if (saved) {
+      const rate = Number(saved);
+      if (PLAYBACK_RATES.includes(rate as (typeof PLAYBACK_RATES)[number])) {
+        dispatch({ type: "SET_RATE", rate });
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem(RATE_KEY, String(state.playbackRate));
+  }, [state.playbackRate]);
+
+  const loadQueue = useCallback(async (mode: PlayerState["mode"]) => {
+    dispatch({ type: "SET_LOADING", loading: true });
+    dispatch({ type: "SET_ERROR", error: null });
+    try {
+      const response = await fetch(`/api/review-queue?mode=${mode}`);
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error?.message ?? "Queue failed");
+      let queue = data.queue as PlayerStateQueue;
+      if (focusWord) {
+        const idx = queue.findIndex((q) => q.id === focusWord);
+        if (idx > 0) {
+          const [item] = queue.splice(idx, 1);
+          queue = [item, ...queue];
+        } else if (idx === -1) {
+          // word-only lesson
+          const wordRes = await fetch(`/api/vocabulary/${focusWord}`);
+          const wordData = await wordRes.json();
+          if (wordRes.ok && wordData.entry?.content) {
+            queue = [
+              {
+                id: wordData.entry.id,
+                word: wordData.entry.word,
+                pronunciation: wordData.entry.content.pronunciation,
+              },
+              ...queue.filter((q) => q.id !== wordData.entry.id),
+            ];
+          }
+        }
+      }
+      dispatch({
+        type: "SET_QUEUE",
+        queue: queue.map((q) => ({
+          id: q.id,
+          word: q.word,
+          pronunciation: q.pronunciation ?? null,
+        })),
+        mode,
+      });
+      setReady(true);
+    } catch (error) {
+      dispatch({
+        type: "SET_ERROR",
+        error: error instanceof Error ? error.message : "Failed to load queue",
+      });
+    } finally {
+      dispatch({ type: "SET_LOADING", loading: false });
+    }
+  }, [focusWord]);
+
+  useEffect(() => {
+    void loadQueue(focusWord ? "all" : "shuffle");
+  }, [loadQueue, focusWord]);
+
+  const loadSegments = useCallback(async (vocabularyId: string) => {
+    dispatch({ type: "SET_LOADING", loading: true });
+    try {
+      const response = await fetch("/api/audio/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ vocabularyId }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error?.message ?? "Audio failed");
+      const segments = (data.script as Array<{
+        id: string;
+        type: string;
+        text: string;
+        order: number;
+      }>).map((seg) => {
+        const stored = data.lesson.segments.find(
+          (s: { segmentType: string; order: number }) =>
+            s.segmentType === seg.type && s.order === seg.order,
+        );
+        return {
+          id: seg.id,
+          type: seg.type,
+          text: seg.text,
+          order: seg.order,
+          audioUrl: stored?.audioUrlOrStorageKey ?? null,
+        };
+      });
+      dispatch({
+        type: "SET_SEGMENTS",
+        segments,
+        useBrowserFallback: data.useBrowserFallback,
+      });
+      await fetch("/api/review-queue", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          vocabularyEntryId: vocabularyId,
+          action: "played",
+        }),
+      });
+    } catch (error) {
+      dispatch({
+        type: "SET_ERROR",
+        error: error instanceof Error ? error.message : "Audio load failed",
+      });
+    } finally {
+      dispatch({ type: "SET_LOADING", loading: false });
+    }
+  }, []);
+
+  useEffect(() => {
+    if (state.currentVocabularyId) {
+      void loadSegments(state.currentVocabularyId);
+    }
+  }, [state.currentVocabularyId, loadSegments]);
+
+  const advanceSegment = useCallback(() => {
+    const s = stateRef.current;
+    if (s.currentSegmentIndex < s.segments.length - 1) {
+      dispatch({
+        type: "SET_SEGMENT_INDEX",
+        index: s.currentSegmentIndex + 1,
+      });
+      return;
+    }
+    // word complete
+    if (s.currentVocabularyId) {
+      void fetch("/api/review-queue", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          vocabularyEntryId: s.currentVocabularyId,
+          action: "completed",
+        }),
+      });
+    }
+    if (s.queuePosition < s.queue.length - 1) {
+      dispatch({ type: "SET_POSITION", position: s.queuePosition + 1 });
+      if (s.isPlaying) dispatch({ type: "PLAY" });
+    } else if (s.repeat) {
+      void loadQueue(s.shuffle ? "shuffle" : s.mode);
+      dispatch({ type: "PLAY" });
+    } else {
+      dispatch({ type: "PAUSE" });
+    }
+  }, [loadQueue]);
+
+  // Playback effect
+  useEffect(() => {
+    cancelSpeakRef.current?.();
+    cancelSpeakRef.current = null;
+    const audio = audioRef.current;
+    if (audio) {
+      audio.pause();
+      audio.removeAttribute("src");
+    }
+
+    if (!state.isPlaying || !state.segments.length) return;
+
+    const segment = state.segments[state.currentSegmentIndex];
+    if (!segment) return;
+
+    const url = segment.audioUrl;
+    const useFile = url && !url.startsWith("browser:");
+
+    if (useFile && audio) {
+      audio.src = url;
+      audio.playbackRate = state.playbackRate;
+      void audio.play().catch(() => {
+        // fallback to browser speech
+        cancelSpeakRef.current = speakBrowser(
+          segment.text,
+          state.playbackRate,
+          advanceSegment,
+          (message) => dispatch({ type: "SET_ERROR", error: message }),
+        );
+      });
+      return;
+    }
+
+    cancelSpeakRef.current = speakBrowser(
+      segment.text,
+      state.playbackRate,
+      advanceSegment,
+      (message) => dispatch({ type: "SET_ERROR", error: message }),
+    );
+
+    return () => {
+      cancelSpeakRef.current?.();
+    };
+  }, [
+    state.isPlaying,
+    state.currentSegmentIndex,
+    state.segments,
+    state.playbackRate,
+    advanceSegment,
+  ]);
+
+  useEffect(() => {
+    const active = document.getElementById(
+      `segment-${state.currentSegmentIndex}`,
+    );
+    if (active) {
+      active.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [state.currentSegmentIndex]);
+
+  const current = state.queue[state.queuePosition];
+
+  function goPrev() {
+    if (state.queuePosition > 0) {
+      dispatch({ type: "SET_POSITION", position: state.queuePosition - 1 });
+    } else {
+      dispatch({ type: "SET_SEGMENT_INDEX", index: 0 });
+    }
+  }
+
+  function goNext() {
+    if (state.queuePosition < state.queue.length - 1) {
+      dispatch({ type: "SET_POSITION", position: state.queuePosition + 1 });
+    }
+  }
+
+  function cycleRate() {
+    const idx = PLAYBACK_RATES.indexOf(
+      state.playbackRate as (typeof PLAYBACK_RATES)[number],
+    );
+    const next = PLAYBACK_RATES[(idx + 1) % PLAYBACK_RATES.length];
+    dispatch({ type: "SET_RATE", rate: next });
+  }
+
+  async function enableShuffle() {
+    dispatch({ type: "SET_SHUFFLE", shuffle: true });
+    await loadQueue("shuffle");
+  }
+
+  return (
+    <div className="flex min-h-[calc(100dvh-2rem)] flex-col">
+      <header className="flex items-center justify-between gap-3 pb-4">
+        <Link
+          href="/"
+          className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full border border-[var(--line)] bg-white font-[family-name:var(--font-ui)] text-sm"
+          aria-label="Back to dashboard"
+        >
+          ←
+        </Link>
+        <div className="text-center font-[family-name:var(--font-ui)]">
+          <p className="text-xs uppercase tracking-[0.18em] text-[var(--ink-muted)]">
+            {state.mode === "shuffle" ? "Shuffle" : state.mode} review
+          </p>
+          <p className="text-sm text-[var(--ink)]">
+            {state.queue.length
+              ? `${state.queuePosition + 1} / ${state.queue.length}`
+              : "—"}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => void loadQueue(state.mode)}
+          className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full border border-[var(--line)] bg-white font-[family-name:var(--font-ui)] text-xs"
+          aria-label="Reload queue"
+        >
+          ↻
+        </button>
+      </header>
+
+      <div className="flex flex-1 flex-col items-center px-1 pb-36 pt-6 text-center">
+        {!ready && state.loading ? (
+          <p className="font-[family-name:var(--font-ui)] text-[var(--ink-muted)]">
+            Preparing your queue…
+          </p>
+        ) : null}
+        {!state.queue.length && !state.loading ? (
+          <div className="max-w-sm space-y-3">
+            <p className="font-[family-name:var(--font-display)] text-2xl">
+              No words ready yet
+            </p>
+            <p className="text-[var(--ink-muted)]">
+              Add a few GRE words from the dashboard, then start an audio review.
+            </p>
+            <Link
+              href="/"
+              className="inline-flex min-h-12 items-center rounded-xl bg-[var(--accent)] px-5 font-[family-name:var(--font-ui)] text-sm font-semibold text-white"
+            >
+              Add words
+            </Link>
+          </div>
+        ) : null}
+
+        {current ? (
+          <>
+            <p className="font-[family-name:var(--font-ui)] text-xs uppercase tracking-[0.2em] text-[var(--ink-muted)]">
+              Now teaching
+            </p>
+            <h1 className="mt-2 font-[family-name:var(--font-display)] text-5xl font-semibold tracking-tight sm:text-6xl">
+              {current.word}
+            </h1>
+            {current.pronunciation?.simple ? (
+              <p className="mt-3 font-[family-name:var(--font-ui)] text-[var(--ink-muted)]">
+                {current.pronunciation.simple}
+              </p>
+            ) : null}
+
+            <div
+              className="mt-8 w-full max-w-lg space-y-2 text-left"
+              aria-live="polite"
+            >
+              {state.segments.map((segment, index) => {
+                const active = index === state.currentSegmentIndex;
+                return (
+                  <div
+                    id={`segment-${index}`}
+                    key={segment.id}
+                    className={`rounded-xl border px-4 py-3 transition ${
+                      active
+                        ? "border-[var(--accent)] bg-[var(--accent-soft)] shadow-[var(--shadow)]"
+                        : "border-transparent bg-white/40 text-[var(--ink-muted)]"
+                    }`}
+                  >
+                    <p className="font-[family-name:var(--font-ui)] text-[10px] font-semibold uppercase tracking-[0.16em] opacity-70">
+                      {segment.type.replace("_", " ")}
+                    </p>
+                    <p className={`mt-1 leading-relaxed ${active ? "text-[var(--ink)]" : ""}`}>
+                      {segment.text}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+            {state.useBrowserFallback ? (
+              <p className="mt-4 font-[family-name:var(--font-ui)] text-xs text-[var(--ink-muted)]">
+                Development speech: browser synthesis (set TTS_PROVIDER=openai for cached MP3s)
+              </p>
+            ) : null}
+          </>
+        ) : null}
+
+        {state.error ? (
+          <p className="mt-4 font-[family-name:var(--font-ui)] text-sm text-[var(--danger)]" role="alert">
+            {state.error}{" "}
+            <button
+              type="button"
+              className="underline"
+              onClick={() => {
+                dispatch({ type: "SET_ERROR", error: null });
+                if (state.currentVocabularyId) {
+                  void loadSegments(state.currentVocabularyId);
+                }
+              }}
+            >
+              Retry
+            </button>
+            {" · "}
+            <button type="button" className="underline" onClick={advanceSegment}>
+              Skip
+            </button>
+          </p>
+        ) : null}
+      </div>
+
+      <div className="fixed inset-x-0 bottom-0 border-t border-[var(--line)] bg-[var(--paper-elevated)]/95 backdrop-blur-md">
+        <div className="mx-auto flex max-w-3xl flex-col gap-3 px-4 py-3 sm:px-6">
+          <div className="h-1 overflow-hidden rounded-full bg-black/5">
+            <div
+              className="h-full bg-[var(--accent)] transition-all"
+              style={{
+                width: state.segments.length
+                  ? `${((state.currentSegmentIndex + 1) / state.segments.length) * 100}%`
+                  : "0%",
+              }}
+            />
+          </div>
+          <div className="flex items-center justify-between gap-2">
+            <button
+              type="button"
+              onClick={goPrev}
+              className="inline-flex min-h-12 min-w-12 items-center justify-center rounded-full border border-[var(--line)] bg-white font-[family-name:var(--font-ui)] text-lg"
+              aria-label="Previous word"
+            >
+              ‹
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                dispatch({ type: state.isPlaying ? "PAUSE" : "PLAY" })
+              }
+              disabled={!state.segments.length}
+              className="inline-flex min-h-14 min-w-14 items-center justify-center rounded-full bg-[var(--accent)] font-[family-name:var(--font-ui)] text-sm font-semibold text-white disabled:opacity-50"
+              aria-label={state.isPlaying ? "Pause" : "Play"}
+            >
+              {state.isPlaying ? "Pause" : "Play"}
+            </button>
+            <button
+              type="button"
+              onClick={goNext}
+              className="inline-flex min-h-12 min-w-12 items-center justify-center rounded-full border border-[var(--line)] bg-white font-[family-name:var(--font-ui)] text-lg"
+              aria-label="Next word"
+            >
+              ›
+            </button>
+            <button
+              type="button"
+              onClick={() => void enableShuffle()}
+              className={`inline-flex min-h-12 min-w-12 items-center justify-center rounded-full border font-[family-name:var(--font-ui)] text-xs ${
+                state.mode === "shuffle"
+                  ? "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]"
+                  : "border-[var(--line)] bg-white"
+              }`}
+              aria-label="Shuffle queue"
+            >
+              Shuffle
+            </button>
+            <button
+              type="button"
+              onClick={cycleRate}
+              className="inline-flex min-h-12 min-w-12 items-center justify-center rounded-full border border-[var(--line)] bg-white font-[family-name:var(--font-ui)] text-xs font-medium"
+              aria-label={`Playback speed ${state.playbackRate}x`}
+            >
+              {state.playbackRate}x
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <audio
+        ref={audioRef}
+        onEnded={advanceSegment}
+        onError={() =>
+          dispatch({
+            type: "SET_ERROR",
+            error: "Audio segment failed to play.",
+          })
+        }
+        className="hidden"
+      />
+    </div>
+  );
+}
+
+type PlayerStateQueue = Array<{
+  id: string;
+  word: string;
+  pronunciation?: { simple?: string | null; ipa?: string | null } | null;
+}>;

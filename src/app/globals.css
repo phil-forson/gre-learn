@@ -1,0 +1,87 @@
+@import "tailwindcss";
+
+:root {
+  --ink: #1a1916;
+  --ink-muted: #5c574e;
+  --paper: #f7f4ef;
+  --paper-elevated: #fffdf9;
+  --line: #e4ddd2;
+  --accent: #1f4b3f;
+  --accent-soft: #dceae4;
+  --root: #2c3e6b;
+  --root-soft: #e8ecf6;
+  --hook: #8a4b12;
+  --hook-soft: #f8ebd8;
+  --danger: #8b2e2e;
+  --focus: #1f4b3f;
+  --shadow: 0 12px 40px rgba(26, 25, 22, 0.06);
+  --font-display: "Fraunces", "Iowan Old Style", "Palatino Linotype", serif;
+  --font-body: "Source Serif 4", "Iowan Old Style", Georgia, serif;
+  --font-ui: "DM Sans", "Helvetica Neue", sans-serif;
+}
+
+@theme inline {
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-paper: var(--paper);
+  --color-paper-elevated: var(--paper-elevated);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-root: var(--root);
+  --color-root-soft: var(--root-soft);
+  --color-hook: var(--hook);
+  --color-hook-soft: var(--hook-soft);
+  --color-danger: var(--danger);
+  --font-display: var(--font-display);
+  --font-body: var(--font-body);
+  --font-ui: var(--font-ui);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  color: var(--ink);
+  font-family: var(--font-body);
+  background:
+    radial-gradient(1200px 600px at 10% -10%, #eef5f1 0%, transparent 55%),
+    radial-gradient(900px 500px at 100% 0%, #f3ebe0 0%, transparent 50%),
+    linear-gradient(180deg, #f9f6f1 0%, var(--paper) 40%, #f3efe7 100%);
+  background-attachment: fixed;
+}
+
+/* Do not set color here — it would override utility classes (active tabs, CTAs). */
+a {
+  text-decoration: none;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.bg-grain {
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+}
