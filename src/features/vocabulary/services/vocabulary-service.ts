@@ -10,6 +10,10 @@ import {
 } from "@/features/generation/services/generate-cached";
 import { getVocabularyRepository } from "@/features/vocabulary/repository";
 import {
+  buildManualLearningContent,
+  parseManualVocabularyCards,
+} from "@/features/vocabulary/services/parse-manual-card";
+import {
   normalizeBatchInput,
   normalizeWord,
 } from "@/features/vocabulary/services/normalize";
@@ -70,7 +74,10 @@ async function runGeneration(
  * Successful cards: re-add returns cache hit (no AI).
  * Failed / incomplete rows: re-add retries generation instead of "already added".
  */
-export async function addVocabularyWord(rawWord: string): Promise<{
+export async function addVocabularyWord(
+  rawWord: string,
+  options?: { groupId?: string | null },
+): Promise<{
   entry: VocabularyEntry;
   created: boolean;
   duplicate: boolean;
@@ -124,12 +131,21 @@ export async function addVocabularyWord(rawWord: string): Promise<{
   }
 
   const now = nowIso();
+  let groupId: string | null = options?.groupId ?? null;
+  if (groupId) {
+    const group = await repo.getWordGroup(userId, groupId);
+    if (!group) {
+      throw new AppError("Word group not found.", "NOT_FOUND", 404);
+    }
+  }
+
   let entry: VocabularyEntry = {
     id: createId("vocab"),
     userId,
     word: normalized.display,
     normalizedWord: normalized.normalized,
     partOfSpeech: [],
+    groupId,
     status: "generating",
     isFavorite: false,
     dateAdded: now,
@@ -159,7 +175,120 @@ export async function addVocabularyWord(rawWord: string): Promise<{
   };
 }
 
-export async function batchAddVocabulary(raw: string) {
+/**
+ * Import a manually written study card. Skips OpenAI entirely.
+ */
+export async function addManualVocabularyWord(
+  card: ReturnType<typeof parseManualVocabularyCards>[number],
+  options?: { groupId?: string | null },
+): Promise<{
+  entry: VocabularyEntry;
+  created: boolean;
+  replaced: boolean;
+}> {
+  const content = buildManualLearningContent(card);
+  const normalized = normalizeWord(content.word);
+  if (!normalized.ok) {
+    throw new AppError(normalized.error, "INVALID_WORD", 400);
+  }
+
+  const repo = getVocabularyRepository();
+  const userId = getUserId();
+  const existing = await repo.getByNormalizedWord(userId, normalized.normalized);
+
+  let groupId: string | null = options?.groupId ?? null;
+  if (groupId) {
+    const group = await repo.getWordGroup(userId, groupId);
+    if (!group) {
+      throw new AppError("Word group not found.", "NOT_FOUND", 404);
+    }
+  }
+
+  const contentVersion = existing ? Math.max(1, existing.contentVersion || 0) + 1 : 1;
+  const hash = await hashLearningContent(content, contentVersion);
+  const now = nowIso();
+
+  if (existing) {
+    if (existing.content) {
+      await repo.markAudioStale(existing.id);
+    }
+    const entry = await repo.update(userId, existing.id, {
+      word: content.word,
+      normalizedWord: content.normalizedWord,
+      partOfSpeech: content.partOfSpeech,
+      groupId: groupId ?? existing.groupId,
+      status: "ready",
+      content,
+      contentVersion,
+      contentHash: hash,
+      generationProvider: "manual",
+      generationModel: null,
+      generationError: null,
+      dateUpdated: now,
+      audioStatus: existing.content ? "stale" : "none",
+      audioError: null,
+    });
+    return { entry, created: false, replaced: true };
+  }
+
+  const entry = await repo.create({
+    id: createId("vocab"),
+    userId,
+    word: content.word,
+    normalizedWord: content.normalizedWord,
+    partOfSpeech: content.partOfSpeech,
+    groupId,
+    status: "ready",
+    isFavorite: false,
+    dateAdded: now,
+    dateUpdated: now,
+    lastReviewedAt: null,
+    reviewCount: 0,
+    contentVersion,
+    contentHash: hash,
+    generationProvider: "manual",
+    generationModel: null,
+    generationError: null,
+    audioStatus: "none",
+    audioError: null,
+    personalNote: null,
+    content,
+  });
+
+  return { entry, created: true, replaced: false };
+}
+
+export async function batchAddManualVocabulary(
+  raw: string,
+  options?: { groupId?: string | null },
+) {
+  const cards = parseManualVocabularyCards(raw);
+  const results = [];
+  for (const card of cards) {
+    try {
+      const result = await addManualVocabularyWord(card, options);
+      results.push({
+        word: card.word,
+        ok: true as const,
+        replaced: result.replaced,
+        entry: result.entry,
+      });
+    } catch (error) {
+      results.push({
+        word: card.word,
+        ok: false as const,
+        error:
+          error instanceof AppError ? error.message : "Failed to import card",
+      });
+    }
+  }
+  return results;
+}
+
+export async function batchAddVocabulary(
+  raw: string,
+  options?: { groupId?: string | null },
+) {
   const words = normalizeBatchInput(raw);
   if (!words.length) {
     throw new AppError("No valid words found in the batch.", "INVALID_BATCH", 400);
@@ -168,7 +297,7 @@ export async function batchAddVocabulary(raw: string) {
   const results = [];
   for (const word of words) {
     try {
-      const result = await addVocabularyWord(word);
+      const result = await addVocabularyWord(word, options);
       results.push({
         word,
         ok: true as const,
@@ -284,6 +413,7 @@ export async function listVocabulary(params: {
   query?: string;
   status?: string;
   favoritesOnly?: boolean;
+  groupId?: string;
   sort?: "alpha" | "newest" | "oldest";
   page?: number;
   pageSize?: number;

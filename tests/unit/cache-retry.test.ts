@@ -15,6 +15,7 @@ function base(
     word: "Laconic",
     normalizedWord: "laconic",
     partOfSpeech: ["adjective"],
+    groupId: null,
     status: "ready",
     isFavorite: false,
     dateAdded: new Date().toISOString(),

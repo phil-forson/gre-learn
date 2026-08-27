@@ -1,0 +1,20 @@
+---
+description: Never wipe or point tests at live local vocabulary/audio data
+alwaysApply: true
+---
+
+# Protect Local User Data
+
+`data/store.json` and `public/audio/generated/` are **live user study data**. They are gitignored and irreplaceable if deleted.
+
+## Hard rules
+
+- **Never** delete, truncate, overwrite, or `rm` `data/`, `data/store.json`, or generated audio as part of tests, scripts, “cleanup”, or fixtures.
+- **Never** hardcode test paths to `process.cwd()/data` or the production store file.
+- Integration/unit tests that need a store must use an **isolated temp directory** (e.g. `fs.mkdtemp` under `os.tmpdir()`) and pass it via `new LocalVocabularyRepository({ dataDir })`.
+- Seed/dev scripts that write the real store must be explicit, opt-in, and never run from `beforeEach`/`afterEach`.
+- If a file under `data/` is missing, do **not** “fix” it by writing an empty store unless the user asked — that can mask a wipe.
+
+## Why this exists
+
+Tests previously cleaned `data/store.json` in `beforeEach`/`afterEach`, which wiped the real vocabulary whenever `npm test` ran (and could race with `npm run dev`). That must never happen again.

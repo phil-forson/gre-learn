@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { promises as fs } from "fs";
+import os from "os";
 import path from "path";
 import { LocalVocabularyRepository } from "@/features/vocabulary/repository/local";
 import { MockVocabularyGenerationProvider } from "@/features/generation/providers/mock";
@@ -7,19 +8,31 @@ import { buildAudioLessonScript } from "@/features/audio/services/lesson-script"
 import { contentHash, createId, nowIso } from "@/lib/utils";
 import type { VocabularyEntry } from "@/features/vocabulary/types";
 
-const TEST_DATA = path.join(process.cwd(), "data", "store.json");
+/**
+ * NEVER use process.cwd()/data here. That is the live vocabulary store.
+ * Tests must use an isolated temp directory only.
+ */
+let testDataDir: string;
+
+async function createIsolatedDataDir(): Promise<string> {
+  return fs.mkdtemp(path.join(os.tmpdir(), "gre-learn-vocab-test-"));
+}
+
+function createTestRepo(): LocalVocabularyRepository {
+  return new LocalVocabularyRepository({ dataDir: testDataDir });
+}
 
 describe("local vocabulary persistence integration", () => {
   beforeEach(async () => {
-    await fs.rm(TEST_DATA, { force: true });
+    testDataDir = await createIsolatedDataDir();
   });
 
   afterEach(async () => {
-    await fs.rm(TEST_DATA, { force: true });
+    await fs.rm(testDataDir, { recursive: true, force: true });
   });
 
   it("adds a word and prevents duplicates", async () => {
-    const repo = new LocalVocabularyRepository();
+    const repo = createTestRepo();
     const provider = new MockVocabularyGenerationProvider();
     const content = await provider.generate("parsimonious");
     const hash = await contentHash([content.normalizedWord, content.definitions[0]!.text]);
@@ -29,6 +42,7 @@ describe("local vocabulary persistence integration", () => {
       word: content.word,
       normalizedWord: content.normalizedWord,
       partOfSpeech: content.partOfSpeech,
+      groupId: null,
       status: "ready",
       isFavorite: false,
       dateAdded: nowIso(),
@@ -61,7 +75,7 @@ describe("local vocabulary persistence integration", () => {
   });
 
   it("regeneration bumps version and marks audio stale", async () => {
-    const repo = new LocalVocabularyRepository();
+    const repo = createTestRepo();
     const content = await new MockVocabularyGenerationProvider().generate("laconic");
     const entry: VocabularyEntry = {
       id: createId("vocab"),
@@ -69,6 +83,7 @@ describe("local vocabulary persistence integration", () => {
       word: content.word,
       normalizedWord: content.normalizedWord,
       partOfSpeech: content.partOfSpeech,
+      groupId: null,
       status: "ready",
       isFavorite: false,
       dateAdded: nowIso(),
@@ -107,5 +122,60 @@ describe("local vocabulary persistence integration", () => {
     expect(lesson).toBeNull();
     const script = buildAudioLessonScript(content);
     expect(script.length).toBeGreaterThan(5);
+  });
+
+  it("concurrent mutations do not wipe vocabulary", async () => {
+    const repo = createTestRepo();
+    const base: VocabularyEntry = {
+      id: "vocab_seed",
+      userId: "default-user",
+      word: "seed",
+      normalizedWord: "seed",
+      partOfSpeech: ["noun"],
+      groupId: null,
+      status: "ready",
+      isFavorite: false,
+      dateAdded: nowIso(),
+      dateUpdated: nowIso(),
+      lastReviewedAt: null,
+      reviewCount: 0,
+      contentVersion: 1,
+      contentHash: "hash",
+      generationProvider: "mock",
+      generationModel: "m",
+      generationError: null,
+      audioStatus: "none",
+      audioError: null,
+      personalNote: null,
+      content: null,
+    };
+    await repo.create(base);
+
+    await Promise.all(
+      Array.from({ length: 40 }, (_, i) =>
+        i % 2 === 0
+          ? repo.addReviewEvent({
+              id: createId("review"),
+              userId: "default-user",
+              vocabularyEntryId: base.id,
+              playedAt: nowIso(),
+              action: i % 4 === 0 ? "played" : "completed",
+            })
+          : repo.update("default-user", base.id, {
+              reviewCount: i,
+              dateUpdated: nowIso(),
+            }),
+      ),
+    );
+
+    const still = await repo.getById("default-user", base.id);
+    expect(still?.word).toBe("seed");
+    const listed = await repo.list({
+      userId: "default-user",
+      page: 1,
+      pageSize: 50,
+      sort: "newest",
+    });
+    expect(listed.total).toBe(1);
   });
 });

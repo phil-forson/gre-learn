@@ -9,6 +9,8 @@ import {
   useRef,
   useState,
 } from "react";
+import { LEARNING_LOCALE } from "@/features/learning/types";
+import type { PlayerSegment } from "@/features/learning/types";
 import {
   PLAYBACK_RATES,
   initialPlayerState,
@@ -17,6 +19,9 @@ import {
 } from "./state";
 
 const RATE_KEY = "gre-learn-playback-rate";
+const ACTIVE_GROUP_KEY = "gre-learn-active-group-id";
+
+type WordGroupSummary = { id: string; name: string; sortOrder: string };
 
 function speakBrowser(
   text: string,
@@ -30,6 +35,7 @@ function speakBrowser(
   }
   window.speechSynthesis.cancel();
   const utter = new SpeechSynthesisUtterance(text);
+  utter.lang = LEARNING_LOCALE;
   utter.rate = rate;
   utter.onend = onEnd;
   utter.onerror = () => onError("Could not speak this segment.");
@@ -44,6 +50,8 @@ export function AudioReviewPlayer() {
   const focusWord = searchParams.get("word");
   const [state, dispatch] = useReducer(playerReducer, initialPlayerState);
   const [ready, setReady] = useState(false);
+  const [groups, setGroups] = useState<WordGroupSummary[]>([]);
+  const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const cancelSpeakRef = useRef<(() => void) | null>(null);
   const stateRef = useRef(state);
@@ -57,17 +65,47 @@ export function AudioReviewPlayer() {
         dispatch({ type: "SET_RATE", rate });
       }
     }
+    const savedGroup = localStorage.getItem(ACTIVE_GROUP_KEY);
+    if (savedGroup) setActiveGroupId(savedGroup);
+    void fetch("/api/word-groups")
+      .then((response) => response.json())
+      .then((data) => {
+        if (!data.groups) return;
+        setGroups(data.groups);
+        if (
+          savedGroup &&
+          !data.groups.some((g: { id: string }) => g.id === savedGroup)
+        ) {
+          setActiveGroupId(null);
+          localStorage.removeItem(ACTIVE_GROUP_KEY);
+        }
+      })
+      .catch(() => undefined);
   }, []);
+
+  useEffect(() => {
+    if (activeGroupId) {
+      localStorage.setItem(ACTIVE_GROUP_KEY, activeGroupId);
+    } else {
+      localStorage.removeItem(ACTIVE_GROUP_KEY);
+    }
+  }, [activeGroupId]);
 
   useEffect(() => {
     localStorage.setItem(RATE_KEY, String(state.playbackRate));
   }, [state.playbackRate]);
 
-  const loadQueue = useCallback(async (mode: PlayerState["mode"]) => {
+  const loadQueue = useCallback(async (
+    mode: PlayerState["mode"],
+    groupId?: string | null,
+  ) => {
     dispatch({ type: "SET_LOADING", loading: true });
     dispatch({ type: "SET_ERROR", error: null });
     try {
-      const response = await fetch(`/api/review-queue?mode=${mode}`);
+      const reviewMode = groupId ? "shuffle" : mode;
+      const params = new URLSearchParams({ mode: reviewMode });
+      if (groupId) params.set("groupId", groupId);
+      const response = await fetch(`/api/review-queue?${params.toString()}`);
       const data = await response.json();
       if (!response.ok) throw new Error(data.error?.message ?? "Queue failed");
       let queue = data.queue as PlayerStateQueue;
@@ -99,7 +137,7 @@ export function AudioReviewPlayer() {
           word: q.word,
           pronunciation: q.pronunciation ?? null,
         })),
-        mode,
+        mode: reviewMode,
       });
       setReady(true);
     } catch (error) {
@@ -113,8 +151,9 @@ export function AudioReviewPlayer() {
   }, [focusWord]);
 
   useEffect(() => {
-    void loadQueue(focusWord ? "all" : "shuffle");
-  }, [loadQueue, focusWord]);
+    const mode = focusWord ? "all" : "shuffle";
+    void loadQueue(mode, activeGroupId);
+  }, [loadQueue, focusWord, activeGroupId]);
 
   const loadSegments = useCallback(async (vocabularyId: string) => {
     dispatch({ type: "SET_LOADING", loading: true });
@@ -126,12 +165,15 @@ export function AudioReviewPlayer() {
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error?.message ?? "Audio failed");
-      const segments = (data.script as Array<{
-        id: string;
-        type: string;
-        text: string;
-        order: number;
-      }>).map((seg) => {
+      const segments: PlayerSegment[] = (
+        data.script as Array<{
+          id: string;
+          type: string;
+          text: string;
+          order: number;
+          pauseAfterMs?: number;
+        }>
+      ).map((seg) => {
         const stored = data.lesson.segments.find(
           (s: { segmentType: string; order: number }) =>
             s.segmentType === seg.type && s.order === seg.order,
@@ -141,6 +183,7 @@ export function AudioReviewPlayer() {
           type: seg.type,
           text: seg.text,
           order: seg.order,
+          pauseAfterMs: seg.pauseAfterMs,
           audioUrl: stored?.audioUrlOrStorageKey ?? null,
         };
       });
@@ -197,12 +240,25 @@ export function AudioReviewPlayer() {
       dispatch({ type: "SET_POSITION", position: s.queuePosition + 1 });
       if (s.isPlaying) dispatch({ type: "PLAY" });
     } else if (s.repeat) {
-      void loadQueue(s.shuffle ? "shuffle" : s.mode);
+      void loadQueue(s.shuffle ? "shuffle" : s.mode, activeGroupId);
       dispatch({ type: "PLAY" });
     } else {
       dispatch({ type: "PAUSE" });
     }
-  }, [loadQueue]);
+  }, [loadQueue, activeGroupId]);
+
+  const activeGroup = groups.find((g) => g.id === activeGroupId) ?? null;
+  const activeGroupIndex = activeGroup
+    ? groups.findIndex((g) => g.id === activeGroup.id)
+    : -1;
+  const hasNextGroup =
+    activeGroupIndex >= 0 && activeGroupIndex < groups.length - 1;
+
+  function goNextGroup() {
+    if (!hasNextGroup) return;
+    const next = groups[activeGroupIndex + 1];
+    if (next) setActiveGroupId(next.id);
+  }
 
   // Playback effect
   useEffect(() => {
@@ -289,9 +345,10 @@ export function AudioReviewPlayer() {
   }
 
   async function toggleShuffle() {
+    if (activeGroupId) return;
     const next = state.mode !== "shuffle";
     dispatch({ type: "SET_SHUFFLE", shuffle: next });
-    await loadQueue(next ? "shuffle" : "all");
+    await loadQueue(next ? "shuffle" : "all", null);
   }
 
   return (
@@ -306,7 +363,12 @@ export function AudioReviewPlayer() {
         </Link>
         <div className="text-center font-[family-name:var(--font-ui)]">
           <p className="text-xs uppercase tracking-[0.18em] text-[var(--ink-muted)]">
-            {state.mode === "shuffle" ? "Shuffle" : state.mode} review
+            {activeGroup
+              ? `${activeGroup.name} · shuffle`
+              : state.mode === "shuffle"
+                ? "Shuffle"
+                : state.mode}{" "}
+            review
           </p>
           <p className="text-sm text-[var(--ink)]">
             {state.queue.length
@@ -316,13 +378,42 @@ export function AudioReviewPlayer() {
         </div>
         <button
           type="button"
-          onClick={() => void loadQueue(state.mode)}
+          onClick={() => void loadQueue(state.mode, activeGroupId)}
           className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full border border-[var(--line)] bg-[var(--surface)] font-[family-name:var(--font-ui)] text-xs"
           aria-label="Reload queue"
         >
           ↻
         </button>
       </header>
+
+      {groups.length ? (
+        <div className="mb-4 flex flex-wrap items-center gap-2 font-[family-name:var(--font-ui)]">
+          <label htmlFor="active-group" className="text-xs uppercase tracking-wider text-[var(--ink-muted)]">
+            Study group
+          </label>
+          <select
+            id="active-group"
+            value={activeGroupId ?? ""}
+            onChange={(e) => setActiveGroupId(e.target.value || null)}
+            className="min-h-10 flex-1 rounded-xl border border-[var(--line)] bg-[var(--surface)] px-3 text-sm sm:max-w-xs"
+          >
+            <option value="">All groups</option>
+            {groups.map((group) => (
+              <option key={group.id} value={group.id}>
+                {group.name}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            disabled={!hasNextGroup}
+            onClick={goNextGroup}
+            className="min-h-10 rounded-xl border border-[var(--line)] bg-[var(--surface)] px-3 text-sm disabled:opacity-50"
+          >
+            Next group
+          </button>
+        </div>
+      ) : null}
 
       <div className="flex flex-1 flex-col items-center px-1 pb-36 pt-6 text-center">
         {!ready && state.loading ? (
@@ -461,16 +552,19 @@ export function AudioReviewPlayer() {
             <button
               type="button"
               onClick={() => void toggleShuffle()}
+              disabled={Boolean(activeGroupId)}
               className={`inline-flex min-h-12 min-w-12 items-center justify-center rounded-full border font-[family-name:var(--font-ui)] text-xs ${
-                state.mode === "shuffle"
+                state.mode === "shuffle" || activeGroupId
                   ? "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]"
                   : "border-[var(--line)] bg-[var(--surface)]"
-              }`}
-              aria-pressed={state.mode === "shuffle"}
+              } disabled:opacity-50`}
+              aria-pressed={state.mode === "shuffle" || Boolean(activeGroupId)}
               aria-label={
-                state.mode === "shuffle"
-                  ? "Turn off shuffle"
-                  : "Turn on shuffle"
+                activeGroupId
+                  ? "Shuffle locked to active group"
+                  : state.mode === "shuffle"
+                    ? "Turn off shuffle"
+                    : "Turn on shuffle"
               }
             >
               Shuffle

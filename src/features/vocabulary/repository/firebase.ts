@@ -2,7 +2,9 @@ import type {
   AudioLesson,
   ReviewEvent,
   VocabularyEntry,
+  WordGroup,
 } from "@/features/vocabulary/types";
+import { sortOrdersForReorder, sortWordGroups } from "@/features/vocabulary/services/sort-order";
 import { getDb } from "@/lib/db/firebase-admin";
 import type {
   ListVocabularyParams,
@@ -14,6 +16,7 @@ const COL = {
   vocabulary: "vocabulary",
   reviewEvents: "reviewEvents",
   audioLessons: "audioLessons",
+  wordGroups: "wordGroups",
 } as const;
 
 export class FirebaseVocabularyRepository implements VocabularyRepository {
@@ -43,6 +46,12 @@ export class FirebaseVocabularyRepository implements VocabularyRepository {
           v.word.toLowerCase().includes(q) ||
           v.normalizedWord.includes(q),
       );
+    }
+
+    if (params.groupId === "ungrouped") {
+      items = items.filter((v) => (v.groupId ?? null) === null);
+    } else if (params.groupId) {
+      items = items.filter((v) => v.groupId === params.groupId);
     }
 
     items = this.sortEntries(items, params.sort);
@@ -214,6 +223,99 @@ export class FirebaseVocabularyRepository implements VocabularyRepository {
       });
     });
     await batch.commit();
+  }
+
+  async listWordGroups(userId: string): Promise<WordGroup[]> {
+    const snap = await this.db
+      .collection(COL.wordGroups)
+      .where("userId", "==", userId)
+      .get();
+    return sortWordGroups(snap.docs.map((d) => d.data() as WordGroup));
+  }
+
+  async getWordGroup(userId: string, id: string): Promise<WordGroup | null> {
+    const doc = await this.db.collection(COL.wordGroups).doc(id).get();
+    if (!doc.exists) return null;
+    const data = doc.data() as WordGroup;
+    if (data.userId !== userId) return null;
+    return data;
+  }
+
+  async createWordGroup(group: WordGroup): Promise<WordGroup> {
+    await this.db.collection(COL.wordGroups).doc(group.id).set(group);
+    return group;
+  }
+
+  async updateWordGroup(
+    userId: string,
+    id: string,
+    patch: Partial<Pick<WordGroup, "name" | "sortOrder" | "dateUpdated">>,
+  ): Promise<WordGroup> {
+    const existing = await this.getWordGroup(userId, id);
+    if (!existing) throw new Error("Word group not found");
+    const next = { ...existing, ...patch };
+    await this.db.collection(COL.wordGroups).doc(id).set(next);
+    return next;
+  }
+
+  async deleteWordGroup(userId: string, id: string): Promise<void> {
+    const existing = await this.getWordGroup(userId, id);
+    if (!existing) return;
+    await this.db.collection(COL.wordGroups).doc(id).delete();
+    const snap = await this.db
+      .collection(COL.vocabulary)
+      .where("userId", "==", userId)
+      .where("groupId", "==", id)
+      .get();
+    const batch = this.db.batch();
+    snap.docs.forEach((doc) => {
+      batch.set(doc.ref, {
+        ...(doc.data() as VocabularyEntry),
+        groupId: null,
+      });
+    });
+    await batch.commit();
+  }
+
+  async reorderWordGroups(
+    userId: string,
+    orderedIds: string[],
+  ): Promise<WordGroup[]> {
+    const userGroups = await this.listWordGroups(userId);
+    const idSet = new Set(userGroups.map((g) => g.id));
+    if (
+      orderedIds.length !== userGroups.length ||
+      orderedIds.some((id) => !idSet.has(id))
+    ) {
+      throw new Error("Invalid group reorder payload");
+    }
+    const orders = sortOrdersForReorder(orderedIds.length);
+    const byId = new Map(userGroups.map((g) => [g.id, g]));
+    const now = new Date().toISOString();
+    const batch = this.db.batch();
+    const reordered = orderedIds.map((groupId, index) => {
+      const next = {
+        ...byId.get(groupId)!,
+        sortOrder: orders[index]!,
+        dateUpdated: now,
+      };
+      batch.set(this.db.collection(COL.wordGroups).doc(groupId), next);
+      return next;
+    });
+    await batch.commit();
+    return sortWordGroups(reordered);
+  }
+
+  async assignWordToGroup(
+    userId: string,
+    vocabularyId: string,
+    groupId: string | null,
+  ): Promise<VocabularyEntry> {
+    if (groupId !== null) {
+      const group = await this.getWordGroup(userId, groupId);
+      if (!group) throw new Error("Word group not found");
+    }
+    return this.update(userId, vocabularyId, { groupId });
   }
 }
 

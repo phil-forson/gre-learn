@@ -1,4 +1,5 @@
 import type { ReviewMode, VocabularyEntry } from "@/features/vocabulary/types";
+import type { ReviewQueueItem } from "@/features/learning/types";
 
 export function isReviewEligible(entry: VocabularyEntry): boolean {
   return (
@@ -9,12 +10,48 @@ export function isReviewEligible(entry: VocabularyEntry): boolean {
   ) && Boolean(entry.content);
 }
 
+/**
+ * Map VocabularyEntry → shared ReviewQueueItem (multi-source-ready).
+ * Existing buildReviewQueue still returns VocabularyEntry for API compat.
+ */
+export function vocabularyEntryToReviewQueueItem(
+  entry: VocabularyEntry,
+): ReviewQueueItem {
+  const primary =
+    entry.content?.definitions.find((d) => d.isPrimary)?.text ??
+    entry.content?.definitions[0]?.text ??
+    null;
+
+  return {
+    sourceType: "vocabulary",
+    sourceId: entry.id,
+    title: entry.word,
+    subtitle: primary,
+    isFavorite: entry.isFavorite,
+    dateAdded: entry.dateAdded,
+    lastReviewedAt: entry.lastReviewedAt,
+    reviewCount: entry.reviewCount,
+    eligible: isReviewEligible(entry),
+  };
+}
+
+export function vocabularyEntriesToReviewQueueItems(
+  entries: VocabularyEntry[],
+): ReviewQueueItem[] {
+  return entries.map(vocabularyEntryToReviewQueueItem);
+}
+
 export function buildReviewQueue(
   entries: VocabularyEntry[],
   mode: ReviewMode,
-  options?: { seed?: number; excludeId?: string },
+  options?: { seed?: number; excludeId?: string; groupId?: string | null },
 ): VocabularyEntry[] {
-  const eligible = entries.filter(isReviewEligible);
+  let eligible = entries.filter(isReviewEligible);
+
+  if (options?.groupId) {
+    eligible = eligible.filter((e) => e.groupId === options.groupId);
+  }
+
   let queue: VocabularyEntry[];
 
   switch (mode) {

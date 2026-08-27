@@ -2,6 +2,7 @@ import type {
   AudioLesson,
   ReviewEvent,
   VocabularyEntry,
+  WordGroup,
 } from "@/features/vocabulary/types";
 
 export type ListVocabularyParams = {
@@ -9,6 +10,8 @@ export type ListVocabularyParams = {
   query?: string;
   status?: string;
   favoritesOnly?: boolean;
+  /** Filter by group id, or `"ungrouped"` for words with no group. */
+  groupId?: string;
   sort?: "alpha" | "newest" | "oldest";
   page?: number;
   pageSize?: number;
@@ -49,4 +52,19 @@ export interface VocabularyRepository {
   ): Promise<AudioLesson | null>;
   saveAudioLesson(lesson: AudioLesson): Promise<AudioLesson>;
   markAudioStale(vocabularyEntryId: string): Promise<void>;
+  listWordGroups(userId: string): Promise<WordGroup[]>;
+  getWordGroup(userId: string, id: string): Promise<WordGroup | null>;
+  createWordGroup(group: WordGroup): Promise<WordGroup>;
+  updateWordGroup(
+    userId: string,
+    id: string,
+    patch: Partial<Pick<WordGroup, "name" | "sortOrder" | "dateUpdated">>,
+  ): Promise<WordGroup>;
+  deleteWordGroup(userId: string, id: string): Promise<void>;
+  reorderWordGroups(userId: string, orderedIds: string[]): Promise<WordGroup[]>;
+  assignWordToGroup(
+    userId: string,
+    vocabularyId: string,
+    groupId: string | null,
+  ): Promise<VocabularyEntry>;
 }

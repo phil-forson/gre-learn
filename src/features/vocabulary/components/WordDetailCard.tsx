@@ -2,10 +2,17 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import type { VocabularyEntry } from "@/features/vocabulary/types";
+import type { VocabularyEntry, WordGroup } from "@/features/vocabulary/types";
+import { GroupAssignSelect } from "./GroupAssignSelect";
 import { StatusBadge } from "./StatusBadge";
 
-export function WordDetailCard({ entry: initial }: { entry: VocabularyEntry }) {
+export function WordDetailCard({
+  entry: initial,
+  groups = [],
+}: {
+  entry: VocabularyEntry;
+  groups?: WordGroup[];
+}) {
   const router = useRouter();
   const [entry, setEntry] = useState(initial);
   const [note, setNote] = useState(entry.personalNote ?? "");
@@ -16,6 +23,14 @@ export function WordDetailCard({ entry: initial }: { entry: VocabularyEntry }) {
   const content = entry.content;
   const primary =
     content?.definitions.find((d) => d.isPrimary) ?? content?.definitions[0];
+  const commonLink = content?.synonyms.find(
+    (s) => s.note?.trim().toLowerCase() === "common link",
+  );
+  const regularSynonyms =
+    content?.synonyms.filter(
+      (s) => s.note?.trim().toLowerCase() !== "common link",
+    ) ?? [];
+  const isManual = entry.generationProvider === "manual";
 
   async function patch(body: Record<string, unknown>) {
     setBusy(String(body.action));
@@ -68,6 +83,11 @@ export function WordDetailCard({ entry: initial }: { entry: VocabularyEntry }) {
               Demo data
             </span>
           ) : null}
+          {isManual ? (
+            <span className="rounded-full bg-[var(--overlay)] px-2.5 py-1 font-[family-name:var(--font-ui)] text-[11px] uppercase tracking-wide text-[var(--ink-muted)]">
+              Your notes
+            </span>
+          ) : null}
         </div>
         <h1 className="font-[family-name:var(--font-display)] text-4xl font-semibold tracking-tight sm:text-5xl">
           {entry.word}
@@ -85,6 +105,13 @@ export function WordDetailCard({ entry: initial }: { entry: VocabularyEntry }) {
         <p className="font-[family-name:var(--font-ui)] text-sm uppercase tracking-[0.16em] text-[var(--ink-muted)]">
           {entry.partOfSpeech.join(" · ") || content?.partOfSpeech.join(" · ")}
         </p>
+        {groups.length ? (
+          <GroupAssignSelect
+            vocabularyId={entry.id}
+            groupId={entry.groupId}
+            groups={groups}
+          />
+        ) : null}
       </header>
 
       <section
@@ -158,27 +185,42 @@ export function WordDetailCard({ entry: initial }: { entry: VocabularyEntry }) {
               Memory Hook
             </h2>
             <p className="mt-2 leading-relaxed">{content.memoryHook.text}</p>
-            <p className="mt-2 font-[family-name:var(--font-ui)] text-xs uppercase tracking-wider text-[var(--hook)]/80">
-              Invented mnemonic · not linguistic origin
-            </p>
+            {!isManual ? (
+              <p className="mt-2 font-[family-name:var(--font-ui)] text-xs uppercase tracking-wider text-[var(--hook)]/80">
+                Invented mnemonic · not linguistic origin
+              </p>
+            ) : null}
           </section>
 
-          <section>
-            <h2 className="font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.18em] text-[var(--ink-muted)]">
-              Synonyms
-            </h2>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {content.synonyms.map((s) => (
-                <span
-                  key={s.word}
-                  className="rounded-full border border-[var(--line)] bg-[var(--surface)] px-3 py-1.5 font-[family-name:var(--font-ui)] text-sm"
-                  title={s.note ?? undefined}
-                >
-                  {s.word}
-                </span>
-              ))}
-            </div>
-          </section>
+          {commonLink ? (
+            <section>
+              <h2 className="font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.18em] text-[var(--ink-muted)]">
+                Common Link
+              </h2>
+              <p className="mt-2 font-[family-name:var(--font-ui)] text-lg">
+                {commonLink.word}
+              </p>
+            </section>
+          ) : null}
+
+          {regularSynonyms.length ? (
+            <section>
+              <h2 className="font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.18em] text-[var(--ink-muted)]">
+                Synonyms
+              </h2>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {regularSynonyms.map((s) => (
+                  <span
+                    key={s.word}
+                    className="rounded-full border border-[var(--line)] bg-[var(--surface)] px-3 py-1.5 font-[family-name:var(--font-ui)] text-sm"
+                    title={s.note ?? undefined}
+                  >
+                    {s.word}
+                  </span>
+                ))}
+              </div>
+            </section>
+          ) : null}
 
           <section className="rounded-2xl border-l-4 border-[var(--accent)] bg-[var(--surface-muted)] py-3 pl-4 pr-3">
             <h2 className="font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.18em] text-[var(--ink-muted)]">
@@ -282,14 +324,16 @@ export function WordDetailCard({ entry: initial }: { entry: VocabularyEntry }) {
         >
           {entry.isFavorite ? "Unfavorite" : "Favorite"}
         </button>
-        <button
-          type="button"
-          disabled={busy === "regenerate"}
-          onClick={() => patch({ action: "regenerate" })}
-          className="min-h-12 rounded-xl border border-[var(--line)] bg-[var(--surface)] px-4 font-[family-name:var(--font-ui)] text-sm"
-        >
-          {busy === "regenerate" ? "Regenerating…" : "Regenerate"}
-        </button>
+        {!isManual ? (
+          <button
+            type="button"
+            disabled={busy === "regenerate"}
+            onClick={() => patch({ action: "regenerate" })}
+            className="min-h-12 rounded-xl border border-[var(--line)] bg-[var(--surface)] px-4 font-[family-name:var(--font-ui)] text-sm"
+          >
+            {busy === "regenerate" ? "Regenerating…" : "Regenerate"}
+          </button>
+        ) : null}
         <button
           type="button"
           disabled={busy === "delete"}

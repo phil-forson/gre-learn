@@ -16,6 +16,7 @@ export async function GET(request: Request) {
       query: searchParams.get("q") ?? undefined,
       status: searchParams.get("status") ?? undefined,
       favoritesOnly: searchParams.get("favorites") === "1",
+      groupId: searchParams.get("groupId") ?? undefined,
       sort:
         (searchParams.get("sort") as "alpha" | "newest" | "oldest" | null) ??
         "newest",

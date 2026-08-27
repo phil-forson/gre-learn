@@ -1,3 +1,5 @@
+import type { PlayerSegment, ReviewMode } from "@/features/learning/types";
+
 export type PlayerState = {
   queue: Array<{
     id: string;
@@ -12,14 +14,9 @@ export type PlayerState = {
   repeat: boolean;
   playbackRate: number;
   volume: number;
-  mode: "all" | "shuffle" | "recent" | "favorites";
-  segments: Array<{
-    id: string;
-    type: string;
-    text: string;
-    order: number;
-    audioUrl: string | null;
-  }>;
+  mode: ReviewMode;
+  /** Segments hydrated for playback — vocab-agnostic LessonSegment + audioUrl. */
+  segments: PlayerSegment[];
   useBrowserFallback: boolean;
   error: string | null;
   loading: boolean;

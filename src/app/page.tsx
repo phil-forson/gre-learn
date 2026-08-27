@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { AddWordForm } from "@/features/vocabulary/components/AddWordForm";
 import { BatchAddForm } from "@/features/vocabulary/components/BatchAddForm";
+import { ManualAddForm } from "@/features/vocabulary/components/ManualAddForm";
 import { WordListItem } from "@/features/vocabulary/components/WordListItem";
 import { getDashboardData } from "@/features/vocabulary/services/vocabulary-service";
 
@@ -22,6 +23,10 @@ export default async function HomePage() {
       </section>
 
       <AddWordForm />
+
+      <section className="rounded-2xl border border-dashed border-[var(--line)] p-4">
+        <ManualAddForm />
+      </section>
 
       <div className="flex flex-col gap-3 sm:flex-row">
         <Link

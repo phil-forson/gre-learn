@@ -1,3 +1,14 @@
+import type { LessonSegment } from "@/features/learning/types";
+
+export type {
+  ContentSourceRef,
+  ContentSourceType,
+  LessonSegment,
+  PlayerSegment,
+  ReviewQueueItem,
+} from "@/features/learning/types";
+export { LEARNING_LOCALE } from "@/features/learning/types";
+
 export type VocabularyStatus =
   | "pending"
   | "generating"
@@ -51,12 +62,22 @@ export type VocabularyLearningContent = {
   confusedWith: Array<{ word: string; distinction?: string | null }>;
 };
 
+export type WordGroup = {
+  id: string;
+  userId: string;
+  name: string;
+  sortOrder: string;
+  dateCreated: string;
+  dateUpdated: string;
+};
+
 export type VocabularyEntry = {
   id: string;
   userId: string;
   word: string;
   normalizedWord: string;
   partOfSpeech: string[];
+  groupId: string | null;
   status: VocabularyStatus;
   isFavorite: boolean;
   dateAdded: string;
@@ -85,12 +106,9 @@ export type AudioSegmentType =
   | "synonyms"
   | "example";
 
-export type AudioLessonSegment = {
-  id: string;
+/** Vocab lesson segment — satisfies shared LessonSegment for the player. */
+export type AudioLessonSegment = LessonSegment & {
   type: AudioSegmentType;
-  text: string;
-  order: number;
-  pauseAfterMs?: number;
 };
 
 export type StoredAudioSegment = {
@@ -128,4 +146,4 @@ export type ReviewEvent = {
   action: ReviewAction;
 };
 
-export type ReviewMode = "all" | "shuffle" | "recent" | "favorites";
+export type { ReviewMode } from "@/features/learning/types";

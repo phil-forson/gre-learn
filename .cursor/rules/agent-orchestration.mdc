@@ -1,0 +1,39 @@
+---
+description: Multi-agent workflow — Director plans, implementers build, Security Reviewer clears every change
+alwaysApply: true
+---
+
+# Agent Orchestration
+
+## Roles
+
+| Agent | Slash | Job |
+| :---- | :---- | :-- |
+| **Director** | `/director` | CEO. Plans, decides, assigns. Grounds every call in product knowledge. |
+| **Implementer** | `/implementer` | Executes Director-assigned work. Does not redefine product priorities. |
+| **Security Reviewer** | `/security-reviewer` | Post-implementation gate. Edge cases, regressions, structure integrity. |
+
+## Mandatory flow
+
+1. Non-trivial feature/refactor → invoke **Director** first (or user says `/director`).
+2. Director outputs plan + ordered task assignments → **Implementer** (`/implementer`) builds them.
+3. After every implementation batch → invoke **Security Reviewer** before calling the work done.
+4. Do not skip Security Reviewer for “small” changes that touch persistence, APIs, audio, or shared types.
+
+## Product source of truth
+
+- Primary: `CURSOR_GRE_VOCAB_BUILD_SPEC.md`
+- Honor P0 over P1 over P2. Never let P2 delay P0.
+- Core loop: add word → enrich → persist → audio segments → review with synced transcript highlight.
+
+## Completion phrases (required)
+
+Every agent **must** end its final message with exactly its phrase on its own line. Parents treat work as unfinished until the phrase appears.
+
+| Agent | Completion phrase |
+| :---- | :---------------- |
+| Director | `DIRECTOR LOCK — plan stands.` |
+| Implementer | `BUILD DONE — ready for security review.` |
+| Security Reviewer | `SECURITY CLEAR — edge cases checked, structures hold.` |
+
+If Security Reviewer finds blockers, it still ends with the phrase but lists **BLOCKERS** above it; parent must fix and re-invoke Security Reviewer.

@@ -37,6 +37,7 @@ async function main() {
       word: content.word,
       normalizedWord: content.normalizedWord,
       partOfSpeech: content.partOfSpeech,
+      groupId: null,
       status: "ready",
       isFavorite: false,
       dateAdded: now,

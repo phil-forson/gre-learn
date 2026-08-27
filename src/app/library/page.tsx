@@ -1,6 +1,8 @@
 import { WordListItem } from "@/features/vocabulary/components/WordListItem";
 import { listVocabulary } from "@/features/vocabulary/services/vocabulary-service";
+import { listWordGroups } from "@/features/vocabulary/services/word-group-service";
 import { LibraryFilters } from "@/features/vocabulary/components/LibraryFilters";
+import { StudyGroupsPanel } from "@/features/vocabulary/components/StudyGroupsPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -10,6 +12,7 @@ type Props = {
     sort?: string;
     favorites?: string;
     status?: string;
+    groupId?: string;
     page?: string;
   }>;
 };
@@ -17,15 +20,22 @@ type Props = {
 export default async function LibraryPage({ searchParams }: Props) {
   const params = await searchParams;
   const page = Number(params.page ?? "1");
-  const result = await listVocabulary({
-    query: params.q,
-    sort: (params.sort as "alpha" | "newest" | "oldest") || "newest",
-    favoritesOnly: params.favorites === "1",
-    status: params.status,
-    page,
-    pageSize: 20,
-  });
+  const activeGroupId = params.groupId ?? "all";
+  const [result, groups] = await Promise.all([
+    listVocabulary({
+      query: params.q,
+      sort: (params.sort as "alpha" | "newest" | "oldest") || "newest",
+      favoritesOnly: params.favorites === "1",
+      status: params.status,
+      groupId:
+        activeGroupId !== "all" ? activeGroupId : undefined,
+      page,
+      pageSize: 20,
+    }),
+    listWordGroups(),
+  ]);
 
+  const groupById = new Map(groups.map((g) => [g.id, g.name]));
   const totalPages = Math.max(1, Math.ceil(result.total / result.pageSize));
 
   return (
@@ -36,20 +46,39 @@ export default async function LibraryPage({ searchParams }: Props) {
         </h1>
         <p className="mt-1 text-[var(--ink-muted)]">
           {result.total} word{result.total === 1 ? "" : "s"}
+          {activeGroupId !== "all" ? (
+            <span>
+              {" "}
+              ·{" "}
+              {activeGroupId === "ungrouped"
+                ? "Ungrouped"
+                : groupById.get(activeGroupId) ?? "Group"}
+            </span>
+          ) : null}
         </p>
       </div>
+
+      <StudyGroupsPanel groups={groups} activeGroupId={activeGroupId} />
 
       <LibraryFilters
         query={params.q ?? ""}
         sort={(params.sort as "alpha" | "newest" | "oldest") || "newest"}
         favorites={params.favorites === "1"}
         status={params.status ?? ""}
+        groupId={activeGroupId}
       />
 
       {result.items.length ? (
         <ul className="space-y-3">
           {result.items.map((entry) => (
-            <WordListItem key={entry.id} entry={entry} />
+            <WordListItem
+              key={entry.id}
+              entry={entry}
+              groupName={
+                entry.groupId ? groupById.get(entry.groupId) ?? null : null
+              }
+              groups={groups}
+            />
           ))}
         </ul>
       ) : (
@@ -65,6 +94,7 @@ export default async function LibraryPage({ searchParams }: Props) {
                 sort: params.sort ?? "newest",
                 ...(params.favorites === "1" ? { favorites: "1" } : {}),
                 ...(params.status ? { status: params.status } : {}),
+                ...(activeGroupId !== "all" ? { groupId: activeGroupId } : {}),
                 page: String(page - 1),
               }).toString()}`}
               className="underline"
@@ -84,6 +114,7 @@ export default async function LibraryPage({ searchParams }: Props) {
                 sort: params.sort ?? "newest",
                 ...(params.favorites === "1" ? { favorites: "1" } : {}),
                 ...(params.status ? { status: params.status } : {}),
+                ...(activeGroupId !== "all" ? { groupId: activeGroupId } : {}),
                 page: String(page + 1),
               }).toString()}`}
               className="underline"

@@ -7,6 +7,7 @@ import {
   toggleFavorite,
   updatePersonalNote,
 } from "@/features/vocabulary/services/vocabulary-service";
+import { assignWordToGroup } from "@/features/vocabulary/services/word-group-service";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -34,6 +35,10 @@ const patchSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("favorite") }),
   z.object({ action: z.literal("regenerate") }),
   z.object({ action: z.literal("note"), note: z.string().max(2000).nullable() }),
+  z.object({
+    action: z.literal("assign_group"),
+    groupId: z.string().min(1).nullable(),
+  }),
 ]);
 
 export async function PATCH(request: Request, { params }: Params) {
@@ -45,6 +50,10 @@ export async function PATCH(request: Request, { params }: Params) {
     }
     if (body.action === "regenerate") {
       return jsonOk({ entry: await regenerateVocabulary(id) });
+    }
+    if (body.action === "assign_group") {
+      await assignWordToGroup(id, body.groupId);
+      return jsonOk({ entry: await getVocabulary(id) });
     }
     return jsonOk({ entry: await updatePersonalNote(id, body.note) });
   } catch (error) {

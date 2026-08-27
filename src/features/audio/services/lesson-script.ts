@@ -41,9 +41,20 @@ function etymologyLine(content: VocabularyLearningContent): string {
   return parts ? `${base} Components: ${parts}.` : `${base}.`;
 }
 
+function commonLinkLine(content: VocabularyLearningContent): string | null {
+  const link = content.synonyms.find(
+    (s) => s.note?.trim().toLowerCase() === "common link",
+  );
+  if (!link) return null;
+  return `Common link: ${link.word}.`;
+}
+
 function synonymsLine(content: VocabularyLearningContent): string | null {
-  if (!content.synonyms.length) return null;
-  const list = content.synonyms.map((s) => s.word).join(", ");
+  const synonyms = content.synonyms.filter(
+    (s) => s.note?.trim().toLowerCase() !== "common link",
+  );
+  if (!synonyms.length) return null;
+  const list = synonyms.map((s) => s.word).join(", ");
   const lastComma = list.lastIndexOf(", ");
   const readable =
     lastComma === -1
@@ -88,6 +99,9 @@ export function buildAudioLessonScript(
   if (definition) {
     push("definition", `${word} means ${definition.replace(/\.$/, "")}.`, 450);
   }
+
+  const commonLink = commonLinkLine(content);
+  if (commonLink) push("synonyms", commonLink, 400);
 
   push("etymology", etymologyLine(content), 450);
   push("memory_hook", `Memory hook: ${content.memoryHook.text}`, 450);

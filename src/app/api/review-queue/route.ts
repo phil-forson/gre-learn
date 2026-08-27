@@ -14,7 +14,10 @@ export async function GET(request: Request) {
         | "recent"
         | "favorites"
         | null) ?? "all";
-    const queue = await getReviewQueue(mode);
+    const groupId = new URL(request.url).searchParams.get("groupId");
+    const queue = await getReviewQueue(mode, {
+      groupId: groupId || undefined,
+    });
     return jsonOk({
       queue: queue.map((e) => ({
         id: e.id,

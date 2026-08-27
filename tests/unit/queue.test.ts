@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildReviewQueue,
   isReviewEligible,
+  vocabularyEntryToReviewQueueItem,
 } from "@/features/review/services/queue";
 import type { VocabularyEntry } from "@/features/vocabulary/types";
 import { SEED_CONTENT } from "@/features/generation/seed-content";
@@ -18,6 +19,7 @@ function entry(
     word: content.word,
     normalizedWord: content.normalizedWord,
     partOfSpeech: content.partOfSpeech,
+    groupId: null,
     status: "ready",
     isFavorite: false,
     dateAdded: "2026-01-01T00:00:00.000Z",
@@ -78,5 +80,24 @@ describe("review queue", () => {
         buildReviewQueue(words, "shuffle", { seed: 1 })[0]!.id,
       );
     }
+  });
+
+  it("maps eligible vocab entries to shared ReviewQueueItem", () => {
+    const item = vocabularyEntryToReviewQueueItem(words[1]!);
+    expect(item.sourceType).toBe("vocabulary");
+    expect(item.sourceId).toBe("2");
+    expect(item.title).toBe(words[1]!.word);
+    expect(item.isFavorite).toBe(true);
+    expect(item.eligible).toBe(true);
+  });
+
+  it("filters by groupId when provided", () => {
+    const grouped = [
+      entry("1", "laconic", { groupId: "g1" }),
+      entry("2", "obdurate", { groupId: "g2" }),
+      entry("3", "pellucid", { groupId: "g1" }),
+    ];
+    const queue = buildReviewQueue(grouped, "all", { groupId: "g1" });
+    expect(queue.map((q) => q.id).sort()).toEqual(["1", "3"]);
   });
 });

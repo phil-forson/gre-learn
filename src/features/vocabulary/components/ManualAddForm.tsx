@@ -4,13 +4,27 @@ import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { WordGroup } from "@/features/vocabulary/types";
 
-export function BatchAddForm() {
+const PLACEHOLDER = `Austere
+Meaning: Very plain, strict, or severe in appearance or manner.
+Common Link: Stern
+Breakdown: From Greek austeros, meaning "harsh" or "severe."
+Memory Trick: Austere = severe and stripped of comfort.
+Sentence: The office had an austere design with little decoration.
+
+Obdurate
+Meaning: Stubbornly refusing to change one's opinion or course of action.
+Common Link: Stubborn
+Breakdown: From Latin obdurare — ob (against) + durare (to harden).
+Memory Trick: Ob-durate — hardened against change.
+Sentence: The obdurate judge refused to reconsider the ruling.`;
+
+export function ManualAddForm() {
   const router = useRouter();
   const [text, setText] = useState("");
   const [groupId, setGroupId] = useState("");
   const [groups, setGroups] = useState<WordGroup[]>([]);
   const [results, setResults] = useState<
-    Array<{ word: string; ok: boolean; duplicate?: boolean; error?: string }>
+    Array<{ word: string; ok: boolean; replaced?: boolean; error?: string }>
   >([]);
   const [pending, setPending] = useState(false);
 
@@ -29,7 +43,7 @@ export function BatchAddForm() {
     setPending(true);
     setResults([]);
     try {
-      const response = await fetch("/api/vocabulary/batch", {
+      const response = await fetch("/api/vocabulary/manual", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -38,18 +52,18 @@ export function BatchAddForm() {
         }),
       });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error?.message ?? "Batch failed");
+      if (!response.ok) throw new Error(data.error?.message ?? "Import failed");
       setResults(
         data.results.map(
           (r: {
             word: string;
             ok: boolean;
-            duplicate?: boolean;
+            replaced?: boolean;
             error?: string;
           }) => ({
             word: r.word,
             ok: r.ok,
-            duplicate: r.duplicate,
+            replaced: r.replaced,
             error: r.error,
           }),
         ),
@@ -59,9 +73,9 @@ export function BatchAddForm() {
     } catch (error) {
       setResults([
         {
-          word: "batch",
+          word: "import",
           ok: false,
-          error: error instanceof Error ? error.message : "Batch failed",
+          error: error instanceof Error ? error.message : "Import failed",
         },
       ]);
     } finally {
@@ -71,30 +85,36 @@ export function BatchAddForm() {
 
   return (
     <form onSubmit={onSubmit} className="space-y-3">
-      <label
-        htmlFor="batch"
-        className="block font-[family-name:var(--font-ui)] text-sm font-medium text-[var(--ink-muted)]"
-      >
-        Batch add (one word per line or comma-separated)
-      </label>
+      <div>
+        <label
+          htmlFor="manual-cards"
+          className="block font-[family-name:var(--font-ui)] text-sm font-medium text-[var(--ink-muted)]"
+        >
+          Import your own study cards (no AI)
+        </label>
+        <p className="mt-1 text-sm text-[var(--ink-muted)]">
+          Paste words in your personal format. Separate multiple words with a blank
+          line. Audio review uses your exact wording.
+        </p>
+      </div>
       <textarea
-        id="batch"
+        id="manual-cards"
         value={text}
         onChange={(e) => setText(e.target.value)}
-        rows={5}
-        placeholder={"laconic\nobdurate\npellucid"}
-        className="w-full rounded-xl border border-[var(--line)] bg-[var(--surface-muted)] p-3 font-[family-name:var(--font-ui)] text-sm"
+        rows={12}
+        placeholder={PLACEHOLDER}
+        className="w-full rounded-xl border border-[var(--line)] bg-[var(--surface-muted)] p-3 font-[family-name:var(--font-ui)] text-sm leading-relaxed"
       />
       {groups.length ? (
         <div>
           <label
-            htmlFor="batch-group"
+            htmlFor="manual-group"
             className="mb-1 block font-[family-name:var(--font-ui)] text-xs font-medium uppercase tracking-wider text-[var(--ink-muted)]"
           >
-            Assign new words to group (optional)
+            Assign to group (optional)
           </label>
           <select
-            id="batch-group"
+            id="manual-group"
             value={groupId}
             onChange={(e) => setGroupId(e.target.value)}
             className="min-h-11 w-full rounded-xl border border-[var(--line)] bg-[var(--surface)] px-3 text-sm text-[var(--ink)] sm:max-w-xs"
@@ -113,17 +133,20 @@ export function BatchAddForm() {
         disabled={pending}
         className="min-h-11 rounded-xl border border-[var(--line)] bg-[var(--surface)] px-4 font-[family-name:var(--font-ui)] text-sm font-medium disabled:opacity-60"
       >
-        {pending ? "Processing…" : "Add batch"}
+        {pending ? "Importing…" : "Import cards"}
       </button>
       {results.length ? (
         <ul className="space-y-1 font-[family-name:var(--font-ui)] text-sm">
           {results.map((r, i) => (
-            <li key={`${r.word}-${i}`} className={r.ok ? "text-[var(--accent)]" : "text-[var(--danger)]"}>
+            <li
+              key={`${r.word}-${i}`}
+              className={r.ok ? "text-[var(--accent)]" : "text-[var(--danger)]"}
+            >
               {r.word}:{" "}
               {r.ok
-                ? r.duplicate
-                  ? "already saved"
-                  : "added"
+                ? r.replaced
+                  ? "replaced with your notes"
+                  : "imported"
                 : r.error ?? "failed"}
             </li>
           ))}

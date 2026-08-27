@@ -8,9 +8,10 @@ type Props = {
   sort: "alpha" | "newest" | "oldest";
   favorites: boolean;
   status: string;
+  groupId: string;
 };
 
-export function LibraryFilters({ query, sort, favorites, status }: Props) {
+export function LibraryFilters({ query, sort, favorites, status, groupId }: Props) {
   const router = useRouter();
   const [q, setQ] = useState(query);
 
@@ -20,10 +21,12 @@ export function LibraryFilters({ query, sort, favorites, status }: Props) {
     const nextSort = next.sort ?? sort;
     const nextFav = next.favorites ?? favorites;
     const nextStatus = next.status ?? status;
+    const nextGroupId = next.groupId ?? groupId;
     if (nextQ) params.set("q", nextQ);
     if (nextSort) params.set("sort", nextSort);
     if (nextFav) params.set("favorites", "1");
     if (nextStatus) params.set("status", nextStatus);
+    if (nextGroupId && nextGroupId !== "all") params.set("groupId", nextGroupId);
     router.push(`/library?${params.toString()}`);
   }
 

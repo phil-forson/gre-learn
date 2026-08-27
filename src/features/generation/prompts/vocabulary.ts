@@ -6,6 +6,10 @@ Analyze the supplied English vocabulary word for a GRE learner.
 Return only a JSON object conforming to the required structured schema.
 Do not wrap in markdown.
 
+Variety (required):
+- Use American English (en-US) exclusively: spelling, definitions, usage notes,
+  and example sentences. Do not use British English variants.
+
 Priorities, in order:
 1. semantic accuracy
 2. etymological accuracy
@@ -15,7 +19,7 @@ Priorities, in order:
 
 Rules:
 - Prefer the dominant GRE-relevant definition.
-- Use clear language.
+- Use clear American English.
 - Never fabricate etymology.
 - Never split a word solely because its spelling resembles a known root.
 - Distinguish factual etymology from mnemonic wordplay.
