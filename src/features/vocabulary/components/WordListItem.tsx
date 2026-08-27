@@ -58,7 +58,7 @@ export function WordListItem({ entry, groupName, groups = [] }: Props) {
             </p>
           </Link>
           {groups.length ? (
-            <div className="shrink-0" onClick={(e) => e.preventDefault()}>
+            <div className="shrink-0">
               <GroupAssignSelect
                 vocabularyId={entry.id}
                 groupId={entry.groupId}

@@ -51,10 +51,22 @@ Work through every item. Skip nothing that applies.
 - Over-trust of client input; missing Zod validation on external/generated data
 - Destructive operations without confirmation or recovery path
 
+### C2. React Server / Client Component boundaries (mandatory)
+
+Fail the review (High) if any of these appear in the diff:
+
+- A file **without** `"use client"` that defines or uses `onClick`, `onChange`, `onSubmit`, or any other DOM event handler
+- A Server Component that passes a function prop (callback, handler, render prop) into a Client Component
+- Interactive UI (selects with handlers, buttons that mutate, forms with client state) living in a Server Component instead of a dedicated `"use client"` child
+- Conditional paths that only explode after first interaction (e.g. group list empty → OK; after create, library re-renders and Server Component suddenly mounts `onClick`) — reason through post-mutation renders, not only the initial empty state
+
+Correct pattern: keep list/page shells as Server Components; put all event handlers inside `"use client"` leaves; pass only serializable props (strings, numbers, plain objects/arrays).
+
 ### D. Tests & proof
 
 - Are there tests for the new edge cases, or only happy path?
 - Run or reason about relevant unit/integration coverage; note what was not executed
+- For UI boundary bugs: confirm the interactive component is client-marked and that server parents do not attach handlers
 
 ## Report format
 

@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { WordGroup } from "@/features/vocabulary/types";
+import { GroupPickOrCreate } from "./GroupPickOrCreate";
 
 const PLACEHOLDER = `Austere
 Meaning: Very plain, strict, or severe in appearance or manner.
@@ -105,29 +106,14 @@ export function ManualAddForm() {
         placeholder={PLACEHOLDER}
         className="w-full rounded-xl border border-[var(--line)] bg-[var(--surface-muted)] p-3 font-[family-name:var(--font-ui)] text-sm leading-relaxed"
       />
-      {groups.length ? (
-        <div>
-          <label
-            htmlFor="manual-group"
-            className="mb-1 block font-[family-name:var(--font-ui)] text-xs font-medium uppercase tracking-wider text-[var(--ink-muted)]"
-          >
-            Assign to group (optional)
-          </label>
-          <select
-            id="manual-group"
-            value={groupId}
-            onChange={(e) => setGroupId(e.target.value)}
-            className="min-h-11 w-full rounded-xl border border-[var(--line)] bg-[var(--surface)] px-3 text-sm text-[var(--ink)] sm:max-w-xs"
-          >
-            <option value="">No group</option>
-            {groups.map((group) => (
-              <option key={group.id} value={group.id}>
-                {group.name}
-              </option>
-            ))}
-          </select>
-        </div>
-      ) : null}
+      <GroupPickOrCreate
+        id="manual-group"
+        groups={groups}
+        groupId={groupId}
+        onGroupIdChange={setGroupId}
+        onGroupsChange={setGroups}
+        disabled={pending}
+      />
       <button
         type="submit"
         disabled={pending}

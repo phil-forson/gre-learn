@@ -52,6 +52,7 @@ export function AudioReviewPlayer() {
   const [ready, setReady] = useState(false);
   const [groups, setGroups] = useState<WordGroupSummary[]>([]);
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
+  const [groupReady, setGroupReady] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const cancelSpeakRef = useRef<(() => void) | null>(null);
   const stateRef = useRef(state);
@@ -65,31 +66,39 @@ export function AudioReviewPlayer() {
         dispatch({ type: "SET_RATE", rate });
       }
     }
+
     const savedGroup = localStorage.getItem(ACTIVE_GROUP_KEY);
-    if (savedGroup) setActiveGroupId(savedGroup);
     void fetch("/api/word-groups")
       .then((response) => response.json())
       .then((data) => {
-        if (!data.groups) return;
-        setGroups(data.groups);
+        const nextGroups: WordGroupSummary[] = data.groups ?? [];
+        setGroups(nextGroups);
         if (
           savedGroup &&
-          !data.groups.some((g: { id: string }) => g.id === savedGroup)
+          nextGroups.some((g) => g.id === savedGroup)
         ) {
+          setActiveGroupId(savedGroup);
+        } else {
           setActiveGroupId(null);
-          localStorage.removeItem(ACTIVE_GROUP_KEY);
+          if (savedGroup) localStorage.removeItem(ACTIVE_GROUP_KEY);
         }
       })
-      .catch(() => undefined);
+      .catch(() => {
+        setActiveGroupId(null);
+      })
+      .finally(() => {
+        setGroupReady(true);
+      });
   }, []);
 
   useEffect(() => {
+    if (!groupReady) return;
     if (activeGroupId) {
       localStorage.setItem(ACTIVE_GROUP_KEY, activeGroupId);
     } else {
       localStorage.removeItem(ACTIVE_GROUP_KEY);
     }
-  }, [activeGroupId]);
+  }, [activeGroupId, groupReady]);
 
   useEffect(() => {
     localStorage.setItem(RATE_KEY, String(state.playbackRate));
@@ -151,19 +160,26 @@ export function AudioReviewPlayer() {
   }, [focusWord]);
 
   useEffect(() => {
+    if (!groupReady) return;
     const mode = focusWord ? "all" : "shuffle";
     void loadQueue(mode, activeGroupId);
-  }, [loadQueue, focusWord, activeGroupId]);
+  }, [loadQueue, focusWord, activeGroupId, groupReady]);
 
-  const loadSegments = useCallback(async (vocabularyId: string) => {
+  const loadSegments = useCallback(async (
+    vocabularyId: string,
+    signal?: AbortSignal,
+  ) => {
     dispatch({ type: "SET_LOADING", loading: true });
+    dispatch({ type: "SET_ERROR", error: null });
     try {
       const response = await fetch("/api/audio/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ vocabularyId }),
+        signal,
       });
       const data = await response.json();
+      if (signal?.aborted) return;
       if (!response.ok) throw new Error(data.error?.message ?? "Audio failed");
       const segments: PlayerSegment[] = (
         data.script as Array<{
@@ -187,6 +203,7 @@ export function AudioReviewPlayer() {
           audioUrl: stored?.audioUrlOrStorageKey ?? null,
         };
       });
+      if (signal?.aborted) return;
       dispatch({
         type: "SET_SEGMENTS",
         segments,
@@ -199,22 +216,29 @@ export function AudioReviewPlayer() {
           vocabularyEntryId: vocabularyId,
           action: "played",
         }),
-      });
+        signal,
+      }).catch(() => undefined);
     } catch (error) {
+      if (signal?.aborted || (error instanceof DOMException && error.name === "AbortError")) {
+        return;
+      }
       dispatch({
         type: "SET_ERROR",
         error: error instanceof Error ? error.message : "Audio load failed",
       });
     } finally {
-      dispatch({ type: "SET_LOADING", loading: false });
+      if (!signal?.aborted) {
+        dispatch({ type: "SET_LOADING", loading: false });
+      }
     }
   }, []);
 
   useEffect(() => {
-    if (state.currentVocabularyId) {
-      void loadSegments(state.currentVocabularyId);
-    }
-  }, [state.currentVocabularyId, loadSegments]);
+    if (!state.currentVocabularyId) return;
+    const controller = new AbortController();
+    void loadSegments(state.currentVocabularyId, controller.signal);
+    return () => controller.abort();
+  }, [state.currentVocabularyId, state.segmentLoadKey, loadSegments]);
 
   const advanceSegment = useCallback(() => {
     const s = stateRef.current;
@@ -416,24 +440,26 @@ export function AudioReviewPlayer() {
       ) : null}
 
       <div className="flex flex-1 flex-col items-center px-1 pb-36 pt-6 text-center">
-        {!ready && state.loading ? (
+        {!groupReady || (!ready && state.loading) ? (
           <p className="font-[family-name:var(--font-ui)] text-[var(--ink-muted)]">
             Preparing your queue…
           </p>
         ) : null}
-        {!state.queue.length && !state.loading ? (
+        {groupReady && !state.queue.length && !state.loading ? (
           <div className="max-w-sm space-y-3">
             <p className="font-[family-name:var(--font-display)] text-2xl">
               No words ready yet
             </p>
             <p className="text-[var(--ink-muted)]">
-              Add a few GRE words from the dashboard, then start an audio review.
+              {activeGroup
+                ? `No ready words in “${activeGroup.name}”. Switch to All groups, or import cards into this group.`
+                : "Add a few GRE words from the dashboard, then start an audio review."}
             </p>
             <Link
-              href="/"
+              href={activeGroup ? "/library" : "/"}
               className="inline-flex min-h-12 items-center rounded-xl bg-[var(--accent)] px-5 font-[family-name:var(--font-ui)] text-sm font-semibold text-[var(--on-accent)]"
             >
-              Add words
+              {activeGroup ? "Open library" : "Add words"}
             </Link>
           </div>
         ) : null}
@@ -449,6 +475,12 @@ export function AudioReviewPlayer() {
             {current.pronunciation?.simple ? (
               <p className="mt-3 font-[family-name:var(--font-ui)] text-[var(--ink-muted)]">
                 {current.pronunciation.simple}
+              </p>
+            ) : null}
+
+            {state.loading && !state.segments.length ? (
+              <p className="mt-8 font-[family-name:var(--font-ui)] text-[var(--ink-muted)]">
+                Loading lesson…
               </p>
             ) : null}
 

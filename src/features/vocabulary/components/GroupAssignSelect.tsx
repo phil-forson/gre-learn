@@ -47,7 +47,11 @@ export function GroupAssignSelect({
   }
 
   return (
-    <div className={compact ? "inline-flex items-center gap-2" : "space-y-1"}>
+    <div
+      className={compact ? "inline-flex items-center gap-2" : "space-y-1"}
+      onClick={(e) => e.stopPropagation()}
+      onPointerDown={(e) => e.stopPropagation()}
+    >
       {!compact ? (
         <label
           htmlFor={`group-${vocabularyId}`}

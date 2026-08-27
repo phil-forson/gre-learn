@@ -8,6 +8,8 @@ export type PlayerState = {
   }>;
   queuePosition: number;
   currentVocabularyId: string | null;
+  /** Bumps whenever segments must be re-fetched (even if vocabulary id is unchanged). */
+  segmentLoadKey: number;
   currentSegmentIndex: number;
   isPlaying: boolean;
   shuffle: boolean;
@@ -40,6 +42,7 @@ export const initialPlayerState: PlayerState = {
   queue: [],
   queuePosition: 0,
   currentVocabularyId: null,
+  segmentLoadKey: 0,
   currentSegmentIndex: 0,
   isPlaying: false,
   shuffle: false,
@@ -65,16 +68,20 @@ export function playerReducer(
         mode: action.mode,
         queuePosition: 0,
         currentVocabularyId: action.queue[0]?.id ?? null,
+        segmentLoadKey: state.segmentLoadKey + 1,
         currentSegmentIndex: 0,
         segments: [],
+        error: null,
       };
     case "SET_POSITION":
       return {
         ...state,
         queuePosition: action.position,
         currentVocabularyId: state.queue[action.position]?.id ?? null,
+        segmentLoadKey: state.segmentLoadKey + 1,
         currentSegmentIndex: 0,
         segments: [],
+        error: null,
       };
     case "SET_SEGMENTS":
       return {
