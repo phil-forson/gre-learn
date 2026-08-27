@@ -3,6 +3,11 @@ import { promises as fs } from "fs";
 import os from "os";
 import path from "path";
 import { LocalVocabularyRepository } from "@/features/vocabulary/repository/local";
+import { setVocabularyRepositoryForTests } from "@/features/vocabulary/repository";
+import {
+  listVocabulary,
+  toggleFavorite,
+} from "@/features/vocabulary/services/vocabulary-service";
 import { MockVocabularyGenerationProvider } from "@/features/generation/providers/mock";
 import { buildAudioLessonScript } from "@/features/audio/services/lesson-script";
 import { contentHash, createId, nowIso } from "@/lib/utils";
@@ -28,6 +33,7 @@ describe("local vocabulary persistence integration", () => {
   });
 
   afterEach(async () => {
+    setVocabularyRepositoryForTests(null);
     await fs.rm(testDataDir, { recursive: true, force: true });
   });
 
@@ -177,5 +183,58 @@ describe("local vocabulary persistence integration", () => {
       sort: "newest",
     });
     expect(listed.total).toBe(1);
+  });
+
+  it("toggleFavorite persists and favoritesOnly lists starred words", async () => {
+    const repo = createTestRepo();
+    setVocabularyRepositoryForTests(repo);
+
+    const starred: VocabularyEntry = {
+      id: "vocab_fav",
+      userId: "default-user",
+      word: "laconic",
+      normalizedWord: "laconic",
+      partOfSpeech: ["adjective"],
+      groupId: null,
+      status: "ready",
+      isFavorite: false,
+      dateAdded: nowIso(),
+      dateUpdated: nowIso(),
+      lastReviewedAt: null,
+      reviewCount: 0,
+      contentVersion: 1,
+      contentHash: "hash",
+      generationProvider: "mock",
+      generationModel: "m",
+      generationError: null,
+      audioStatus: "none",
+      audioError: null,
+      personalNote: null,
+      content: null,
+    };
+    const other: VocabularyEntry = {
+      ...starred,
+      id: "vocab_other",
+      word: "obdurate",
+      normalizedWord: "obdurate",
+    };
+    await repo.create(starred);
+    await repo.create(other);
+
+    const toggled = await toggleFavorite(starred.id);
+    expect(toggled.isFavorite).toBe(true);
+
+    const favorites = await listVocabulary({
+      favoritesOnly: true,
+      sort: "alpha",
+      pageSize: 50,
+    });
+    expect(favorites.total).toBe(1);
+    expect(favorites.items.map((e) => e.id)).toEqual([starred.id]);
+
+    const untoggled = await toggleFavorite(starred.id);
+    expect(untoggled.isFavorite).toBe(false);
+    const empty = await listVocabulary({ favoritesOnly: true, pageSize: 50 });
+    expect(empty.total).toBe(0);
   });
 });

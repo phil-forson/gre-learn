@@ -28,7 +28,8 @@ export default async function FavoritesPage() {
         </ul>
       ) : (
         <p className="text-[var(--ink-muted)]">
-          Star words from their detail page to collect them here.
+          Tap the star on a word in the library or while listening to audio
+          review to collect favorites here.
         </p>
       )}
     </div>

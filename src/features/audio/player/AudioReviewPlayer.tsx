@@ -5,45 +5,35 @@ import { useSearchParams } from "next/navigation";
 import {
   useCallback,
   useEffect,
+  useMemo,
   useReducer,
   useRef,
   useState,
 } from "react";
-import { LEARNING_LOCALE } from "@/features/learning/types";
 import type { PlayerSegment } from "@/features/learning/types";
+import { FavoriteToggle } from "@/features/vocabulary/components/FavoriteToggle";
 import {
   PLAYBACK_RATES,
   initialPlayerState,
   playerReducer,
+  type PlayerQueueItem,
   type PlayerState,
 } from "./state";
+import { speakBrowser, warmBrowserVoice } from "./browser-tts";
+import {
+  filterSegmentsForNarration,
+  loadNarrationFields,
+  NARRATION_FIELD_KEYS,
+  NARRATION_FIELD_LABELS,
+  saveNarrationFields,
+  setNarrationField,
+  type NarrationFieldKey,
+} from "./narration-fields";
 
 const RATE_KEY = "gre-learn-playback-rate";
 const ACTIVE_GROUP_KEY = "gre-learn-active-group-id";
 
 type WordGroupSummary = { id: string; name: string; sortOrder: string };
-
-function speakBrowser(
-  text: string,
-  rate: number,
-  onEnd: () => void,
-  onError: (message: string) => void,
-) {
-  if (typeof window === "undefined" || !window.speechSynthesis) {
-    onError("Speech synthesis is not available in this browser.");
-    return () => {};
-  }
-  window.speechSynthesis.cancel();
-  const utter = new SpeechSynthesisUtterance(text);
-  utter.lang = LEARNING_LOCALE;
-  utter.rate = rate;
-  utter.onend = onEnd;
-  utter.onerror = () => onError("Could not speak this segment.");
-  window.speechSynthesis.speak(utter);
-  return () => {
-    window.speechSynthesis.cancel();
-  };
-}
 
 export function AudioReviewPlayer() {
   const searchParams = useSearchParams();
@@ -53,10 +43,24 @@ export function AudioReviewPlayer() {
   const [groups, setGroups] = useState<WordGroupSummary[]>([]);
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
   const [groupReady, setGroupReady] = useState(false);
+  const [fieldsOpen, setFieldsOpen] = useState(false);
+  const [prefsHydrated, setPrefsHydrated] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const cancelSpeakRef = useRef<(() => void) | null>(null);
+  const browserVoiceRef = useRef<SpeechSynthesisVoice | null>(null);
+  const queueAbortRef = useRef<AbortController | null>(null);
+  const queueRequestIdRef = useRef(0);
+  const focusPinnedRef = useRef(false);
   const stateRef = useRef(state);
   stateRef.current = state;
+
+  const filteredSegments = useMemo(
+    () =>
+      filterSegmentsForNarration(state.segments, state.narrationFields),
+    [state.segments, state.narrationFields],
+  );
+  const filteredRef = useRef(filteredSegments);
+  filteredRef.current = filteredSegments;
 
   useEffect(() => {
     const saved = localStorage.getItem(RATE_KEY);
@@ -66,6 +70,13 @@ export function AudioReviewPlayer() {
         dispatch({ type: "SET_RATE", rate });
       }
     }
+
+    dispatch({ type: "SET_NARRATION_FIELDS", fields: loadNarrationFields() });
+    setPrefsHydrated(true);
+
+    void warmBrowserVoice().then((voice) => {
+      browserVoiceRef.current = voice;
+    });
 
     const savedGroup = localStorage.getItem(ACTIVE_GROUP_KEY);
     void fetch("/api/word-groups")
@@ -104,65 +115,109 @@ export function AudioReviewPlayer() {
     localStorage.setItem(RATE_KEY, String(state.playbackRate));
   }, [state.playbackRate]);
 
+  useEffect(() => {
+    if (!prefsHydrated) return;
+    saveNarrationFields(state.narrationFields);
+  }, [state.narrationFields, prefsHydrated]);
+
   const loadQueue = useCallback(async (
     mode: PlayerState["mode"],
     groupId?: string | null,
+    options?: { excludeId?: string | null },
   ) => {
+    queueAbortRef.current?.abort();
+    const controller = new AbortController();
+    queueAbortRef.current = controller;
+    const requestId = ++queueRequestIdRef.current;
+
     dispatch({ type: "SET_LOADING", loading: true });
     dispatch({ type: "SET_ERROR", error: null });
     try {
       const reviewMode = groupId ? "shuffle" : mode;
       const params = new URLSearchParams({ mode: reviewMode });
       if (groupId) params.set("groupId", groupId);
-      const response = await fetch(`/api/review-queue?${params.toString()}`);
+      if (options?.excludeId) params.set("excludeId", options.excludeId);
+      const response = await fetch(`/api/review-queue?${params.toString()}`, {
+        cache: "no-store",
+        signal: controller.signal,
+      });
       const data = await response.json();
+      if (requestId !== queueRequestIdRef.current) return;
       if (!response.ok) throw new Error(data.error?.message ?? "Queue failed");
       let queue = data.queue as PlayerStateQueue;
-      if (focusWord) {
+      let pinnedThisLoad = false;
+
+      // Pin focusWord only on the first successful queue load so Shuffle / Reload can reshuffle.
+      if (focusWord && !focusPinnedRef.current) {
         const idx = queue.findIndex((q) => q.id === focusWord);
         if (idx > 0) {
           const [item] = queue.splice(idx, 1);
           queue = [item, ...queue];
+          pinnedThisLoad = true;
+        } else if (idx === 0) {
+          pinnedThisLoad = true;
         } else if (idx === -1) {
-          // word-only lesson
-          const wordRes = await fetch(`/api/vocabulary/${focusWord}`);
+          const wordRes = await fetch(`/api/vocabulary/${focusWord}`, {
+            signal: controller.signal,
+          });
           const wordData = await wordRes.json();
+          if (requestId !== queueRequestIdRef.current) return;
           if (wordRes.ok && wordData.entry?.content) {
             queue = [
               {
                 id: wordData.entry.id,
                 word: wordData.entry.word,
+                isFavorite: Boolean(wordData.entry.isFavorite),
                 pronunciation: wordData.entry.content.pronunciation,
               },
               ...queue.filter((q) => q.id !== wordData.entry.id),
             ];
+            pinnedThisLoad = true;
           }
         }
       }
+
+      if (requestId !== queueRequestIdRef.current) return;
       dispatch({
         type: "SET_QUEUE",
         queue: queue.map((q) => ({
           id: q.id,
           word: q.word,
+          isFavorite: Boolean(q.isFavorite),
           pronunciation: q.pronunciation ?? null,
         })),
         mode: reviewMode,
       });
+      if (pinnedThisLoad) focusPinnedRef.current = true;
       setReady(true);
     } catch (error) {
+      if (
+        controller.signal.aborted ||
+        (error instanceof DOMException && error.name === "AbortError") ||
+        (error instanceof Error && error.name === "AbortError")
+      ) {
+        return;
+      }
+      if (requestId !== queueRequestIdRef.current) return;
       dispatch({
         type: "SET_ERROR",
         error: error instanceof Error ? error.message : "Failed to load queue",
       });
     } finally {
-      dispatch({ type: "SET_LOADING", loading: false });
+      if (requestId === queueRequestIdRef.current) {
+        dispatch({ type: "SET_LOADING", loading: false });
+      }
     }
   }, [focusWord]);
 
   useEffect(() => {
+    focusPinnedRef.current = false;
+  }, [focusWord]);
+
+  useEffect(() => {
     if (!groupReady) return;
-    const mode = focusWord ? "all" : "shuffle";
-    void loadQueue(mode, activeGroupId);
+    // Always shuffle review by default; focusWord only pins that word first.
+    void loadQueue("shuffle", activeGroupId);
   }, [loadQueue, focusWord, activeGroupId, groupReady]);
 
   const loadSegments = useCallback(async (
@@ -219,7 +274,11 @@ export function AudioReviewPlayer() {
         signal,
       }).catch(() => undefined);
     } catch (error) {
-      if (signal?.aborted || (error instanceof DOMException && error.name === "AbortError")) {
+      if (
+        signal?.aborted ||
+        (error instanceof DOMException && error.name === "AbortError") ||
+        (error instanceof Error && error.name === "AbortError")
+      ) {
         return;
       }
       dispatch({
@@ -240,16 +299,8 @@ export function AudioReviewPlayer() {
     return () => controller.abort();
   }, [state.currentVocabularyId, state.segmentLoadKey, loadSegments]);
 
-  const advanceSegment = useCallback(() => {
+  const advanceWord = useCallback(() => {
     const s = stateRef.current;
-    if (s.currentSegmentIndex < s.segments.length - 1) {
-      dispatch({
-        type: "SET_SEGMENT_INDEX",
-        index: s.currentSegmentIndex + 1,
-      });
-      return;
-    }
-    // word complete
     if (s.currentVocabularyId) {
       void fetch("/api/review-queue", {
         method: "POST",
@@ -264,12 +315,50 @@ export function AudioReviewPlayer() {
       dispatch({ type: "SET_POSITION", position: s.queuePosition + 1 });
       if (s.isPlaying) dispatch({ type: "PLAY" });
     } else if (s.repeat) {
-      void loadQueue(s.shuffle ? "shuffle" : s.mode, activeGroupId);
+      void loadQueue(s.shuffle ? "shuffle" : s.mode, activeGroupId, {
+        excludeId: s.currentVocabularyId,
+      });
       dispatch({ type: "PLAY" });
     } else {
       dispatch({ type: "PAUSE" });
     }
   }, [loadQueue, activeGroupId]);
+
+  const advanceSegment = useCallback(() => {
+    const s = stateRef.current;
+    const filtered = filteredRef.current;
+    if (s.currentSegmentIndex < filtered.length - 1) {
+      dispatch({
+        type: "SET_SEGMENT_INDEX",
+        index: s.currentSegmentIndex + 1,
+      });
+      return;
+    }
+    advanceWord();
+  }, [advanceWord]);
+
+  // When the filtered lesson is empty for this word, skip to the next queue item.
+  useEffect(() => {
+    if (state.loading) return;
+    if (!state.currentVocabularyId) return;
+    if (!state.segments.length) return;
+    if (filteredSegments.length > 0) return;
+
+    const s = stateRef.current;
+    const canAdvance =
+      s.queuePosition < s.queue.length - 1 || s.repeat;
+    if (!canAdvance) {
+      if (s.isPlaying) dispatch({ type: "PAUSE" });
+      return;
+    }
+    advanceWord();
+  }, [
+    state.loading,
+    state.currentVocabularyId,
+    state.segments,
+    filteredSegments.length,
+    advanceWord,
+  ]);
 
   const activeGroup = groups.find((g) => g.id === activeGroupId) ?? null;
   const activeGroupIndex = activeGroup
@@ -294,9 +383,9 @@ export function AudioReviewPlayer() {
       audio.removeAttribute("src");
     }
 
-    if (!state.isPlaying || !state.segments.length) return;
+    if (!state.isPlaying || !filteredSegments.length) return;
 
-    const segment = state.segments[state.currentSegmentIndex];
+    const segment = filteredSegments[state.currentSegmentIndex];
     if (!segment) return;
 
     const url = segment.audioUrl;
@@ -312,6 +401,7 @@ export function AudioReviewPlayer() {
           state.playbackRate,
           advanceSegment,
           (message) => dispatch({ type: "SET_ERROR", error: message }),
+          browserVoiceRef.current,
         );
       });
       return;
@@ -322,6 +412,7 @@ export function AudioReviewPlayer() {
       state.playbackRate,
       advanceSegment,
       (message) => dispatch({ type: "SET_ERROR", error: message }),
+      browserVoiceRef.current,
     );
 
     return () => {
@@ -330,7 +421,7 @@ export function AudioReviewPlayer() {
   }, [
     state.isPlaying,
     state.currentSegmentIndex,
-    state.segments,
+    filteredSegments,
     state.playbackRate,
     advanceSegment,
   ]);
@@ -368,15 +459,48 @@ export function AudioReviewPlayer() {
     dispatch({ type: "SET_RATE", rate: next });
   }
 
+  function toggleNarrationFieldPref(key: NarrationFieldKey) {
+    const next = setNarrationField(
+      state.narrationFields,
+      key,
+      !state.narrationFields[key],
+    );
+    if (next === state.narrationFields) return;
+    dispatch({ type: "SET_NARRATION_FIELDS", fields: next });
+  }
+
   async function toggleShuffle() {
-    if (activeGroupId) return;
-    const next = state.mode !== "shuffle";
-    dispatch({ type: "SET_SHUFFLE", shuffle: next });
-    await loadQueue(next ? "shuffle" : "all", null);
+    // Shuffle / Reload both reshuffle. With no group, off → on; on → reshuffle.
+    // Study groups stay in shuffle and reshuffle on every click.
+    const excludeId = state.currentVocabularyId;
+    if (activeGroupId) {
+      dispatch({ type: "SET_SHUFFLE", shuffle: true });
+      await loadQueue("shuffle", activeGroupId, { excludeId });
+      return;
+    }
+    if (state.mode === "shuffle") {
+      dispatch({ type: "SET_SHUFFLE", shuffle: true });
+      await loadQueue("shuffle", null, { excludeId });
+      return;
+    }
+    dispatch({ type: "SET_SHUFFLE", shuffle: true });
+    await loadQueue("shuffle", null);
+  }
+
+  function reloadQueue() {
+    const excludeId =
+      state.mode === "shuffle" || activeGroupId
+        ? state.currentVocabularyId
+        : null;
+    void loadQueue(state.mode, activeGroupId, { excludeId });
   }
 
   return (
-    <div className="flex min-h-[calc(100dvh-2rem)] flex-col">
+    <div
+      className={`flex min-h-[calc(100dvh-2rem)] flex-col ${
+        fieldsOpen ? "pb-72" : "pb-36"
+      }`}
+    >
       <header className="flex items-center justify-between gap-3 pb-4">
         <Link
           href="/"
@@ -402,7 +526,7 @@ export function AudioReviewPlayer() {
         </div>
         <button
           type="button"
-          onClick={() => void loadQueue(state.mode, activeGroupId)}
+          onClick={reloadQueue}
           className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full border border-[var(--line)] bg-[var(--surface)] font-[family-name:var(--font-ui)] text-xs"
           aria-label="Reload queue"
         >
@@ -469,9 +593,23 @@ export function AudioReviewPlayer() {
             <p className="font-[family-name:var(--font-ui)] text-xs uppercase tracking-[0.2em] text-[var(--ink-muted)]">
               Now teaching
             </p>
-            <h1 className="mt-2 font-[family-name:var(--font-display)] text-5xl font-semibold tracking-tight sm:text-6xl">
-              {current.word}
-            </h1>
+            <div className="mt-2 flex items-center justify-center gap-3">
+              <h1 className="font-[family-name:var(--font-display)] text-5xl font-semibold tracking-tight sm:text-6xl">
+                {current.word}
+              </h1>
+              <FavoriteToggle
+                vocabularyId={current.id}
+                isFavorite={current.isFavorite}
+                className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl text-2xl leading-none text-[var(--hook)] transition hover:bg-[var(--surface-muted)] disabled:opacity-60"
+                onToggled={(next) =>
+                  dispatch({
+                    type: "SET_FAVORITE",
+                    id: current.id,
+                    isFavorite: next,
+                  })
+                }
+              />
+            </div>
             {current.pronunciation?.simple ? (
               <p className="mt-3 font-[family-name:var(--font-ui)] text-[var(--ink-muted)]">
                 {current.pronunciation.simple}
@@ -488,7 +626,7 @@ export function AudioReviewPlayer() {
               className="mt-8 w-full max-w-lg space-y-2 text-left"
               aria-live="polite"
             >
-              {state.segments.map((segment, index) => {
+              {filteredSegments.map((segment, index) => {
                 const active = index === state.currentSegmentIndex;
                 return (
                   <div
@@ -543,12 +681,59 @@ export function AudioReviewPlayer() {
 
       <div className="fixed inset-x-0 bottom-0 border-t border-[var(--line)] bg-[var(--paper-elevated)]/95 backdrop-blur-md">
         <div className="mx-auto flex max-w-3xl flex-col gap-3 px-4 py-3 sm:px-6">
+          {fieldsOpen ? (
+            <div
+              className="rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-3 font-[family-name:var(--font-ui)]"
+              role="dialog"
+              aria-label="Narration fields"
+            >
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ink-muted)]">
+                  Fields
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setFieldsOpen(false)}
+                  className="inline-flex min-h-10 min-w-10 items-center justify-center rounded-full text-sm text-[var(--ink-muted)]"
+                  aria-label="Close fields"
+                >
+                  ✕
+                </button>
+              </div>
+              <ul className="grid max-h-[40dvh] grid-cols-1 gap-1 overflow-y-auto sm:grid-cols-2">
+                {NARRATION_FIELD_KEYS.map((key) => {
+                  const checked = state.narrationFields[key];
+                  const onlyOne =
+                    checked &&
+                    !NARRATION_FIELD_KEYS.some(
+                      (k) => k !== key && state.narrationFields[k],
+                    );
+                  return (
+                    <li key={key}>
+                      <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-xl px-2 py-1.5 hover:bg-[var(--surface-muted)]">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          disabled={onlyOne}
+                          onChange={() => toggleNarrationFieldPref(key)}
+                          className="size-4 accent-[var(--accent)]"
+                        />
+                        <span className="text-sm text-[var(--ink)]">
+                          {NARRATION_FIELD_LABELS[key]}
+                        </span>
+                      </label>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ) : null}
           <div className="h-1 overflow-hidden rounded-full bg-[var(--overlay)]">
             <div
               className="h-full bg-[var(--accent)] transition-all"
               style={{
-                width: state.segments.length
-                  ? `${((state.currentSegmentIndex + 1) / state.segments.length) * 100}%`
+                width: filteredSegments.length
+                  ? `${((state.currentSegmentIndex + 1) / filteredSegments.length) * 100}%`
                   : "0%",
               }}
             />
@@ -567,7 +752,7 @@ export function AudioReviewPlayer() {
               onClick={() =>
                 dispatch({ type: state.isPlaying ? "PAUSE" : "PLAY" })
               }
-              disabled={!state.segments.length}
+              disabled={!filteredSegments.length}
               className="inline-flex min-h-14 min-w-14 items-center justify-center rounded-full bg-[var(--accent)] font-[family-name:var(--font-ui)] text-sm font-semibold text-[var(--on-accent)] disabled:opacity-50"
               aria-label={state.isPlaying ? "Pause" : "Play"}
             >
@@ -583,20 +768,30 @@ export function AudioReviewPlayer() {
             </button>
             <button
               type="button"
+              onClick={() => setFieldsOpen((open) => !open)}
+              className={`inline-flex min-h-12 min-w-12 items-center justify-center rounded-full border font-[family-name:var(--font-ui)] text-xs ${
+                fieldsOpen
+                  ? "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]"
+                  : "border-[var(--line)] bg-[var(--surface)]"
+              }`}
+              aria-pressed={fieldsOpen}
+              aria-label="Narration fields"
+            >
+              Fields
+            </button>
+            <button
+              type="button"
               onClick={() => void toggleShuffle()}
-              disabled={Boolean(activeGroupId)}
               className={`inline-flex min-h-12 min-w-12 items-center justify-center rounded-full border font-[family-name:var(--font-ui)] text-xs ${
                 state.mode === "shuffle" || activeGroupId
                   ? "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]"
                   : "border-[var(--line)] bg-[var(--surface)]"
-              } disabled:opacity-50`}
+              }`}
               aria-pressed={state.mode === "shuffle" || Boolean(activeGroupId)}
               aria-label={
-                activeGroupId
-                  ? "Shuffle locked to active group"
-                  : state.mode === "shuffle"
-                    ? "Turn off shuffle"
-                    : "Turn on shuffle"
+                activeGroupId || state.mode === "shuffle"
+                  ? "Reshuffle queue"
+                  : "Turn on shuffle"
               }
             >
               Shuffle
@@ -628,8 +823,4 @@ export function AudioReviewPlayer() {
   );
 }
 
-type PlayerStateQueue = Array<{
-  id: string;
-  word: string;
-  pronunciation?: { simple?: string | null; ipa?: string | null } | null;
-}>;
+type PlayerStateQueue = PlayerQueueItem[];

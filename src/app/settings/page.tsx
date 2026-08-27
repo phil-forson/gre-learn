@@ -55,20 +55,27 @@ export default function SettingsPage() {
         </h2>
         <ul className="mt-3 list-disc space-y-2 pl-5">
           <li>
-            <strong>OpenAI usage:</strong> one API call the first time you add a word.
+            <strong>OpenAI word generation:</strong> one API call the first time you add a word.
             The full learning card is saved locally (or in Firebase). Re-adding the same
-            word, browsing, and audio review never call OpenAI again.
+            word and browsing never regenerate the card.
           </li>
           <li>
             <strong>Regenerate</strong> on a word page is the only action that spends a
-            new OpenAI call for an existing word.
+            new OpenAI call for an existing word’s learning content.
+          </li>
+          <li>
+            <strong>TTS:</strong> with{" "}
+            <code className="rounded bg-[var(--overlay)] px-1">TTS_PROVIDER=openai</code>{" "}
+            and voice <code className="rounded bg-[var(--overlay)] px-1">nova</code>,
+            audio review uses a consistent female American voice (MP3s cached per segment).
+            First play of a word/lesson segment calls the TTS API once.
           </li>
           <li>
             Theme and playback speed are remembered in this browser.
           </li>
           <li>
             With <code className="rounded bg-[var(--overlay)] px-1">TTS_PROVIDER=mock</code>,
-            audio uses free browser speech (no TTS API cost).
+            audio uses free browser speech and picks a female en-US system voice when available.
           </li>
         </ul>
       </section>

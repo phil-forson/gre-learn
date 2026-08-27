@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { VocabularyEntry, WordGroup } from "@/features/vocabulary/types";
+import { FavoriteToggle } from "./FavoriteToggle";
 import { GroupAssignSelect } from "./GroupAssignSelect";
 import { StatusBadge } from "./StatusBadge";
 
@@ -37,11 +38,6 @@ export function WordListItem({ entry, groupName, groups = [] }: Props) {
               <div>
                 <h3 className="font-[family-name:var(--font-display)] text-xl font-semibold tracking-tight text-[var(--ink)]">
                   {entry.word}
-                  {entry.isFavorite ? (
-                    <span className="ml-2 text-sm text-[var(--hook)]" aria-label="Favorite">
-                      ★
-                    </span>
-                  ) : null}
                 </h3>
                 <p className="mt-1 font-[family-name:var(--font-ui)] text-xs uppercase tracking-wider text-[var(--ink-muted)]">
                   {entry.partOfSpeech.join(" · ") || "—"}
@@ -57,16 +53,20 @@ export function WordListItem({ entry, groupName, groups = [] }: Props) {
               {subtitle}
             </p>
           </Link>
-          {groups.length ? (
-            <div className="shrink-0">
+          <div className="flex shrink-0 items-start gap-2">
+            <FavoriteToggle
+              vocabularyId={entry.id}
+              isFavorite={entry.isFavorite}
+            />
+            {groups.length ? (
               <GroupAssignSelect
                 vocabularyId={entry.id}
                 groupId={entry.groupId}
                 groups={groups}
                 compact
               />
-            </div>
-          ) : null}
+            ) : null}
+          </div>
         </div>
         {groupName ? (
           <p className="mt-2 font-[family-name:var(--font-ui)] text-[11px] uppercase tracking-wide text-[var(--accent)]">

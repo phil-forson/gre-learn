@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { VocabularyEntry, WordGroup } from "@/features/vocabulary/types";
+import { FavoriteToggle } from "./FavoriteToggle";
 import { GroupAssignSelect } from "./GroupAssignSelect";
 import { StatusBadge } from "./StatusBadge";
 
@@ -316,14 +317,12 @@ export function WordDetailCard({
         >
           Play word lesson
         </a>
-        <button
-          type="button"
-          disabled={busy === "favorite"}
-          onClick={() => patch({ action: "favorite" })}
-          className="min-h-12 rounded-xl border border-[var(--line)] bg-[var(--surface)] px-4 font-[family-name:var(--font-ui)] text-sm"
-        >
-          {entry.isFavorite ? "Unfavorite" : "Favorite"}
-        </button>
+        <FavoriteToggle
+          vocabularyId={entry.id}
+          isFavorite={entry.isFavorite}
+          variant="button"
+          onToggled={(next) => setEntry((prev) => ({ ...prev, isFavorite: next }))}
+        />
         {!isManual ? (
           <button
             type="button"

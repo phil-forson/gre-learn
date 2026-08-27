@@ -189,10 +189,13 @@ export async function recordReviewEvent(
 
 export async function getReviewQueue(
   mode: "all" | "shuffle" | "recent" | "favorites",
-  options?: { groupId?: string | null },
+  options?: { groupId?: string | null; excludeId?: string | null },
 ) {
   const { buildReviewQueue } = await import("@/features/review/services/queue");
   const repo = getVocabularyRepository();
   const entries = await repo.listEligibleForReview(getUserId());
-  return buildReviewQueue(entries, mode, { groupId: options?.groupId ?? undefined });
+  return buildReviewQueue(entries, mode, {
+    groupId: options?.groupId ?? undefined,
+    excludeId: options?.excludeId ?? undefined,
+  });
 }

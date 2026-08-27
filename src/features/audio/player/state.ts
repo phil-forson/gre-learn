@@ -1,11 +1,18 @@
 import type { PlayerSegment, ReviewMode } from "@/features/learning/types";
+import {
+  defaultNarrationFields,
+  type NarrationFieldsPrefs,
+} from "./narration-fields";
+
+export type PlayerQueueItem = {
+  id: string;
+  word: string;
+  isFavorite: boolean;
+  pronunciation: { simple?: string | null; ipa?: string | null } | null;
+};
 
 export type PlayerState = {
-  queue: Array<{
-    id: string;
-    word: string;
-    pronunciation: { simple?: string | null; ipa?: string | null } | null;
-  }>;
+  queue: PlayerQueueItem[];
   queuePosition: number;
   currentVocabularyId: string | null;
   /** Bumps whenever segments must be re-fetched (even if vocabulary id is unchanged). */
@@ -17,8 +24,9 @@ export type PlayerState = {
   playbackRate: number;
   volume: number;
   mode: ReviewMode;
-  /** Segments hydrated for playback — vocab-agnostic LessonSegment + audioUrl. */
+  /** Full lesson segments from generate — filter at play time via narrationFields. */
   segments: PlayerSegment[];
+  narrationFields: NarrationFieldsPrefs;
   useBrowserFallback: boolean;
   error: string | null;
   loading: boolean;
@@ -29,6 +37,8 @@ export type PlayerAction =
   | { type: "SET_POSITION"; position: number }
   | { type: "SET_SEGMENTS"; segments: PlayerState["segments"]; useBrowserFallback: boolean }
   | { type: "SET_SEGMENT_INDEX"; index: number }
+  | { type: "SET_NARRATION_FIELDS"; fields: NarrationFieldsPrefs }
+  | { type: "SET_FAVORITE"; id: string; isFavorite: boolean }
   | { type: "PLAY" }
   | { type: "PAUSE" }
   | { type: "SET_RATE"; rate: number }
@@ -51,6 +61,7 @@ export const initialPlayerState: PlayerState = {
   volume: 1,
   mode: "all",
   segments: [],
+  narrationFields: defaultNarrationFields(),
   useBrowserFallback: true,
   error: null,
   loading: false,
@@ -66,6 +77,7 @@ export function playerReducer(
         ...state,
         queue: action.queue,
         mode: action.mode,
+        shuffle: action.mode === "shuffle",
         queuePosition: 0,
         currentVocabularyId: action.queue[0]?.id ?? null,
         segmentLoadKey: state.segmentLoadKey + 1,
@@ -92,6 +104,21 @@ export function playerReducer(
       };
     case "SET_SEGMENT_INDEX":
       return { ...state, currentSegmentIndex: action.index };
+    case "SET_NARRATION_FIELDS":
+      return {
+        ...state,
+        narrationFields: action.fields,
+        currentSegmentIndex: 0,
+      };
+    case "SET_FAVORITE":
+      return {
+        ...state,
+        queue: state.queue.map((item) =>
+          item.id === action.id
+            ? { ...item, isFavorite: action.isFavorite }
+            : item,
+        ),
+      };
     case "PLAY":
       return { ...state, isPlaying: true };
     case "PAUSE":

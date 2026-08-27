@@ -7,22 +7,26 @@ import {
 
 export async function GET(request: Request) {
   try {
+    const url = new URL(request.url);
     const mode =
-      (new URL(request.url).searchParams.get("mode") as
+      (url.searchParams.get("mode") as
         | "all"
         | "shuffle"
         | "recent"
         | "favorites"
         | null) ?? "all";
-    const groupId = new URL(request.url).searchParams.get("groupId");
+    const groupId = url.searchParams.get("groupId");
+    const excludeId = url.searchParams.get("excludeId");
     const queue = await getReviewQueue(mode, {
       groupId: groupId || undefined,
+      excludeId: excludeId || undefined,
     });
     return jsonOk({
       queue: queue.map((e) => ({
         id: e.id,
         word: e.word,
         normalizedWord: e.normalizedWord,
+        isFavorite: e.isFavorite,
         pronunciation: e.content?.pronunciation ?? null,
         primaryDefinition:
           e.content?.definitions.find((d) => d.isPrimary)?.text ??
