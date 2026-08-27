@@ -1,3 +1,4 @@
+import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { getProviderStatus } from "@/lib/env";
 
 export const dynamic = "force-dynamic";
@@ -16,7 +17,11 @@ export default function SettingsPage() {
         </p>
       </div>
 
-      <section className="space-y-3 rounded-2xl border border-[var(--line)] bg-white/60 p-5 font-[family-name:var(--font-ui)] text-sm">
+      <section className="rounded-2xl border border-[var(--line)] bg-[var(--surface-muted)] p-5">
+        <ThemeToggle />
+      </section>
+
+      <section className="space-y-3 rounded-2xl border border-[var(--line)] bg-[var(--surface-muted)] p-5 font-[family-name:var(--font-ui)] text-sm">
         <h2 className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ink-muted)]">
           Data & providers
         </h2>
@@ -44,7 +49,7 @@ export default function SettingsPage() {
         />
       </section>
 
-      <section className="rounded-2xl border border-[var(--line)] bg-white/60 p-5 text-sm leading-relaxed text-[var(--ink-muted)]">
+      <section className="rounded-2xl border border-[var(--line)] bg-[var(--surface-muted)] p-5 text-sm leading-relaxed text-[var(--ink-muted)]">
         <h2 className="font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ink-muted)]">
           Notes
         </h2>
@@ -59,10 +64,10 @@ export default function SettingsPage() {
             new OpenAI call for an existing word.
           </li>
           <li>
-            Playback speed is remembered in this browser (Audio Review page).
+            Theme and playback speed are remembered in this browser.
           </li>
           <li>
-            With <code className="rounded bg-black/5 px-1">TTS_PROVIDER=mock</code>,
+            With <code className="rounded bg-[var(--overlay)] px-1">TTS_PROVIDER=mock</code>,
             audio uses free browser speech (no TTS API cost).
           </li>
         </ul>

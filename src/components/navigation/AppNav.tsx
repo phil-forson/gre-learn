@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { ThemeQuickToggle } from "@/components/theme/ThemeQuickToggle";
 
 const links = [
   { href: "/", label: "Home" },
@@ -31,12 +32,15 @@ export function AppNav() {
             GRE Learn
           </Link>
         </div>
-        <Link
-          href="/audio"
-          className="hidden rounded-full bg-[var(--accent)] px-4 py-2 font-[family-name:var(--font-ui)] text-sm font-medium text-[#fffdf9] sm:inline-flex"
-        >
-          Start review
-        </Link>
+        <div className="flex items-center gap-2">
+          <ThemeQuickToggle />
+          <Link
+            href="/audio"
+            className="hidden rounded-full bg-[var(--accent)] px-4 py-2 font-[family-name:var(--font-ui)] text-sm font-medium text-[var(--on-accent)] sm:inline-flex"
+          >
+            Start review
+          </Link>
+        </div>
       </div>
       <nav
         aria-label="Primary"
@@ -54,7 +58,7 @@ export function AppNav() {
               className={`whitespace-nowrap rounded-full px-3 py-2 transition-colors ${
                 active
                   ? "bg-[var(--accent-soft)] font-medium text-[var(--accent)]"
-                  : "text-[var(--ink-muted)] hover:bg-black/5 hover:text-[var(--ink)]"
+                  : "text-[var(--ink-muted)] hover:bg-[var(--overlay)] hover:text-[var(--ink)]"
               }`}
             >
               {link.label}

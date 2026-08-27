@@ -1,6 +1,7 @@
 @import "tailwindcss";
 
-:root {
+:root,
+html[data-theme="light"] {
   --ink: #1a1916;
   --ink-muted: #5c574e;
   --paper: #f7f4ef;
@@ -13,11 +14,46 @@
   --hook: #8a4b12;
   --hook-soft: #f8ebd8;
   --danger: #8b2e2e;
+  --danger-soft: #f8ecec;
   --focus: #1f4b3f;
   --shadow: 0 12px 40px rgba(26, 25, 22, 0.06);
+  --surface: #fffdf9;
+  --surface-muted: rgba(255, 253, 249, 0.72);
+  --on-accent: #fffdf9;
+  --overlay: rgba(26, 25, 22, 0.06);
+  --bg-1: #eef5f1;
+  --bg-2: #f3ebe0;
+  --bg-3: #f9f6f1;
+  --bg-4: #f3efe7;
   --font-display: "Fraunces", "Iowan Old Style", "Palatino Linotype", serif;
   --font-body: "Source Serif 4", "Iowan Old Style", Georgia, serif;
   --font-ui: "DM Sans", "Helvetica Neue", sans-serif;
+}
+
+html[data-theme="dark"] {
+  --ink: #f2eee7;
+  --ink-muted: #b7b0a5;
+  --paper: #141311;
+  --paper-elevated: #1c1b18;
+  --line: #34322c;
+  --accent: #8ecbb8;
+  --accent-soft: #1f3c35;
+  --root: #b4c2ea;
+  --root-soft: #1e2436;
+  --hook: #e3b57a;
+  --hook-soft: #3a2c1a;
+  --danger: #e8a4a4;
+  --danger-soft: #3a2222;
+  --focus: #8ecbb8;
+  --shadow: 0 16px 48px rgba(0, 0, 0, 0.4);
+  --surface: #1c1b18;
+  --surface-muted: rgba(28, 27, 24, 0.82);
+  --on-accent: #101412;
+  --overlay: rgba(255, 253, 249, 0.07);
+  --bg-1: #1a2420;
+  --bg-2: #241e18;
+  --bg-3: #121110;
+  --bg-4: #141311;
 }
 
 @theme inline {
@@ -44,6 +80,12 @@
 
 html {
   scroll-behavior: smooth;
+  color-scheme: light;
+  background: var(--paper);
+}
+
+html[data-theme="dark"] {
+  color-scheme: dark;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -66,9 +108,9 @@ body {
   color: var(--ink);
   font-family: var(--font-body);
   background:
-    radial-gradient(1200px 600px at 10% -10%, #eef5f1 0%, transparent 55%),
-    radial-gradient(900px 500px at 100% 0%, #f3ebe0 0%, transparent 50%),
-    linear-gradient(180deg, #f9f6f1 0%, var(--paper) 40%, #f3efe7 100%);
+    radial-gradient(1200px 600px at 10% -10%, var(--bg-1) 0%, transparent 55%),
+    radial-gradient(900px 500px at 100% 0%, var(--bg-2) 0%, transparent 50%),
+    linear-gradient(180deg, var(--bg-3) 0%, var(--paper) 40%, var(--bg-4) 100%);
   background-attachment: fixed;
 }
 
@@ -84,4 +126,8 @@ a {
 
 .bg-grain {
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+}
+
+html[data-theme="dark"] .bg-grain {
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.08'/%3E%3C/svg%3E");
 }

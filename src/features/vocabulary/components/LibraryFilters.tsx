@@ -35,13 +35,13 @@ export function LibraryFilters({ query, sort, favorites, status }: Props) {
   return (
     <form
       onSubmit={onSubmit}
-      className="flex flex-col gap-3 rounded-2xl border border-[var(--line)] bg-white/50 p-3 font-[family-name:var(--font-ui)] sm:flex-row sm:flex-wrap sm:items-center"
+      className="flex flex-col gap-3 rounded-2xl border border-[var(--line)] bg-[var(--surface-muted)] p-3 font-[family-name:var(--font-ui)] sm:flex-row sm:flex-wrap sm:items-center"
     >
       <input
         value={q}
         onChange={(e) => setQ(e.target.value)}
         placeholder="Search words…"
-        className="min-h-11 flex-1 rounded-xl border border-[var(--line)] bg-white px-3 text-sm"
+        className="min-h-11 flex-1 rounded-xl border border-[var(--line)] bg-[var(--surface)] px-3 text-sm"
         aria-label="Search vocabulary"
       />
       <select
@@ -49,7 +49,7 @@ export function LibraryFilters({ query, sort, favorites, status }: Props) {
         onChange={(e) =>
           apply({ sort: e.target.value as Props["sort"] })
         }
-        className="min-h-11 rounded-xl border border-[var(--line)] bg-white px-3 text-sm"
+        className="min-h-11 rounded-xl border border-[var(--line)] bg-[var(--surface)] px-3 text-sm text-[var(--ink)]"
         aria-label="Sort"
       >
         <option value="newest">Newest first</option>
@@ -59,7 +59,7 @@ export function LibraryFilters({ query, sort, favorites, status }: Props) {
       <select
         value={status}
         onChange={(e) => apply({ status: e.target.value })}
-        className="min-h-11 rounded-xl border border-[var(--line)] bg-white px-3 text-sm"
+        className="min-h-11 rounded-xl border border-[var(--line)] bg-[var(--surface)] px-3 text-sm text-[var(--ink)]"
         aria-label="Status filter"
       >
         <option value="">All statuses</option>
@@ -68,7 +68,7 @@ export function LibraryFilters({ query, sort, favorites, status }: Props) {
         <option value="generation_failed">Generation failed</option>
         <option value="audio_failed">Audio failed</option>
       </select>
-      <label className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-[var(--line)] bg-white px-3 text-sm">
+      <label className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-[var(--line)] bg-[var(--surface)] px-3 text-sm">
         <input
           type="checkbox"
           checked={favorites}
@@ -78,7 +78,7 @@ export function LibraryFilters({ query, sort, favorites, status }: Props) {
       </label>
       <button
         type="submit"
-        className="min-h-11 rounded-xl bg-[var(--accent)] px-4 text-sm font-medium text-white"
+        className="min-h-11 rounded-xl bg-[var(--accent)] px-4 text-sm font-medium text-[var(--on-accent)]"
       >
         Search
       </button>

@@ -288,9 +288,10 @@ export function AudioReviewPlayer() {
     dispatch({ type: "SET_RATE", rate: next });
   }
 
-  async function enableShuffle() {
-    dispatch({ type: "SET_SHUFFLE", shuffle: true });
-    await loadQueue("shuffle");
+  async function toggleShuffle() {
+    const next = state.mode !== "shuffle";
+    dispatch({ type: "SET_SHUFFLE", shuffle: next });
+    await loadQueue(next ? "shuffle" : "all");
   }
 
   return (
@@ -298,7 +299,7 @@ export function AudioReviewPlayer() {
       <header className="flex items-center justify-between gap-3 pb-4">
         <Link
           href="/"
-          className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full border border-[var(--line)] bg-white font-[family-name:var(--font-ui)] text-sm"
+          className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full border border-[var(--line)] bg-[var(--surface)] font-[family-name:var(--font-ui)] text-sm"
           aria-label="Back to dashboard"
         >
           ←
@@ -316,7 +317,7 @@ export function AudioReviewPlayer() {
         <button
           type="button"
           onClick={() => void loadQueue(state.mode)}
-          className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full border border-[var(--line)] bg-white font-[family-name:var(--font-ui)] text-xs"
+          className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full border border-[var(--line)] bg-[var(--surface)] font-[family-name:var(--font-ui)] text-xs"
           aria-label="Reload queue"
         >
           ↻
@@ -339,7 +340,7 @@ export function AudioReviewPlayer() {
             </p>
             <Link
               href="/"
-              className="inline-flex min-h-12 items-center rounded-xl bg-[var(--accent)] px-5 font-[family-name:var(--font-ui)] text-sm font-semibold text-white"
+              className="inline-flex min-h-12 items-center rounded-xl bg-[var(--accent)] px-5 font-[family-name:var(--font-ui)] text-sm font-semibold text-[var(--on-accent)]"
             >
               Add words
             </Link>
@@ -373,7 +374,7 @@ export function AudioReviewPlayer() {
                     className={`rounded-xl border px-4 py-3 transition ${
                       active
                         ? "border-[var(--accent)] bg-[var(--accent-soft)] shadow-[var(--shadow)]"
-                        : "border-transparent bg-white/40 text-[var(--ink-muted)]"
+                        : "border-transparent bg-[var(--surface-muted)] text-[var(--ink-muted)]"
                     }`}
                   >
                     <p className="font-[family-name:var(--font-ui)] text-[10px] font-semibold uppercase tracking-[0.16em] opacity-70">
@@ -419,7 +420,7 @@ export function AudioReviewPlayer() {
 
       <div className="fixed inset-x-0 bottom-0 border-t border-[var(--line)] bg-[var(--paper-elevated)]/95 backdrop-blur-md">
         <div className="mx-auto flex max-w-3xl flex-col gap-3 px-4 py-3 sm:px-6">
-          <div className="h-1 overflow-hidden rounded-full bg-black/5">
+          <div className="h-1 overflow-hidden rounded-full bg-[var(--overlay)]">
             <div
               className="h-full bg-[var(--accent)] transition-all"
               style={{
@@ -433,7 +434,7 @@ export function AudioReviewPlayer() {
             <button
               type="button"
               onClick={goPrev}
-              className="inline-flex min-h-12 min-w-12 items-center justify-center rounded-full border border-[var(--line)] bg-white font-[family-name:var(--font-ui)] text-lg"
+              className="inline-flex min-h-12 min-w-12 items-center justify-center rounded-full border border-[var(--line)] bg-[var(--surface)] font-[family-name:var(--font-ui)] text-lg"
               aria-label="Previous word"
             >
               ‹
@@ -444,7 +445,7 @@ export function AudioReviewPlayer() {
                 dispatch({ type: state.isPlaying ? "PAUSE" : "PLAY" })
               }
               disabled={!state.segments.length}
-              className="inline-flex min-h-14 min-w-14 items-center justify-center rounded-full bg-[var(--accent)] font-[family-name:var(--font-ui)] text-sm font-semibold text-white disabled:opacity-50"
+              className="inline-flex min-h-14 min-w-14 items-center justify-center rounded-full bg-[var(--accent)] font-[family-name:var(--font-ui)] text-sm font-semibold text-[var(--on-accent)] disabled:opacity-50"
               aria-label={state.isPlaying ? "Pause" : "Play"}
             >
               {state.isPlaying ? "Pause" : "Play"}
@@ -452,27 +453,32 @@ export function AudioReviewPlayer() {
             <button
               type="button"
               onClick={goNext}
-              className="inline-flex min-h-12 min-w-12 items-center justify-center rounded-full border border-[var(--line)] bg-white font-[family-name:var(--font-ui)] text-lg"
+              className="inline-flex min-h-12 min-w-12 items-center justify-center rounded-full border border-[var(--line)] bg-[var(--surface)] font-[family-name:var(--font-ui)] text-lg"
               aria-label="Next word"
             >
               ›
             </button>
             <button
               type="button"
-              onClick={() => void enableShuffle()}
+              onClick={() => void toggleShuffle()}
               className={`inline-flex min-h-12 min-w-12 items-center justify-center rounded-full border font-[family-name:var(--font-ui)] text-xs ${
                 state.mode === "shuffle"
                   ? "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]"
-                  : "border-[var(--line)] bg-white"
+                  : "border-[var(--line)] bg-[var(--surface)]"
               }`}
-              aria-label="Shuffle queue"
+              aria-pressed={state.mode === "shuffle"}
+              aria-label={
+                state.mode === "shuffle"
+                  ? "Turn off shuffle"
+                  : "Turn on shuffle"
+              }
             >
               Shuffle
             </button>
             <button
               type="button"
               onClick={cycleRate}
-              className="inline-flex min-h-12 min-w-12 items-center justify-center rounded-full border border-[var(--line)] bg-white font-[family-name:var(--font-ui)] text-xs font-medium"
+              className="inline-flex min-h-12 min-w-12 items-center justify-center rounded-full border border-[var(--line)] bg-[var(--surface)] font-[family-name:var(--font-ui)] text-xs font-medium"
               aria-label={`Playback speed ${state.playbackRate}x`}
             >
               {state.playbackRate}x

@@ -21,7 +21,7 @@ export function WordListItem({ entry }: { entry: VocabularyEntry }) {
         href={`/words/${entry.id}`}
         className={`block rounded-2xl border px-4 py-4 transition ${
           failed
-            ? "border-red-200/80 bg-red-50/40 hover:border-red-300"
+            ? "border-[var(--danger)]/35 bg-[var(--danger-soft)] hover:border-[var(--danger)]/50"
             : "border-[var(--line)] bg-[var(--paper-elevated)]/90 hover:border-[var(--accent)]/30"
         }`}
       >

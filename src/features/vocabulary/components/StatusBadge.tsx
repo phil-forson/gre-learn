@@ -16,10 +16,10 @@ export function StatusBadge({ status }: { status: VocabularyStatus }) {
     <span
       className={`inline-flex rounded-full px-2.5 py-1 font-[family-name:var(--font-ui)] text-[11px] font-medium uppercase tracking-wide ${
         failed
-          ? "bg-red-50 text-[var(--danger)]"
+          ? "bg-[var(--danger-soft)] text-[var(--danger)]"
           : status === "ready" || status === "audio_ready"
             ? "bg-[var(--accent-soft)] text-[var(--accent)]"
-            : "bg-black/5 text-[var(--ink-muted)]"
+            : "bg-[var(--overlay)] text-[var(--ink-muted)]"
       }`}
     >
       {labels[status] ?? status}

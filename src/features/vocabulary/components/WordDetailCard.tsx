@@ -64,7 +64,7 @@ export function WordDetailCard({ entry: initial }: { entry: VocabularyEntry }) {
         <div className="flex flex-wrap items-center gap-2">
           <StatusBadge status={entry.status} />
           {entry.isDemo ? (
-            <span className="rounded-full bg-black/5 px-2.5 py-1 font-[family-name:var(--font-ui)] text-[11px] uppercase tracking-wide text-[var(--ink-muted)]">
+            <span className="rounded-full bg-[var(--overlay)] px-2.5 py-1 font-[family-name:var(--font-ui)] text-[11px] uppercase tracking-wide text-[var(--ink-muted)]">
               Demo data
             </span>
           ) : null}
@@ -90,7 +90,7 @@ export function WordDetailCard({ entry: initial }: { entry: VocabularyEntry }) {
       <section
         className={`rounded-2xl border p-5 shadow-[var(--shadow)] ${
           entry.status === "generation_failed"
-            ? "border-red-200 bg-red-50/50"
+            ? "border-[var(--danger)]/35 bg-[var(--danger-soft)]"
             : "border-[var(--line)] bg-[var(--paper-elevated)]"
         }`}
       >
@@ -141,7 +141,7 @@ export function WordDetailCard({ entry: initial }: { entry: VocabularyEntry }) {
                 {content.etymology.components.map((c) => (
                   <li
                     key={`${c.text}-${c.meaning}`}
-                    className="rounded-xl bg-white/50 px-3 py-2 text-sm"
+                    className="rounded-xl bg-[var(--surface-muted)] px-3 py-2 text-sm"
                   >
                     <span className="font-semibold">{c.text}</span>
                     <span className="text-[var(--ink-muted)]"> · {c.type}</span>
@@ -171,7 +171,7 @@ export function WordDetailCard({ entry: initial }: { entry: VocabularyEntry }) {
               {content.synonyms.map((s) => (
                 <span
                   key={s.word}
-                  className="rounded-full border border-[var(--line)] bg-white px-3 py-1.5 font-[family-name:var(--font-ui)] text-sm"
+                  className="rounded-full border border-[var(--line)] bg-[var(--surface)] px-3 py-1.5 font-[family-name:var(--font-ui)] text-sm"
                   title={s.note ?? undefined}
                 >
                   {s.word}
@@ -180,7 +180,7 @@ export function WordDetailCard({ entry: initial }: { entry: VocabularyEntry }) {
             </div>
           </section>
 
-          <section className="rounded-2xl border-l-4 border-[var(--accent)] bg-white/50 py-3 pl-4 pr-3">
+          <section className="rounded-2xl border-l-4 border-[var(--accent)] bg-[var(--surface-muted)] py-3 pl-4 pr-3">
             <h2 className="font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.18em] text-[var(--ink-muted)]">
               Example
             </h2>
@@ -255,13 +255,13 @@ export function WordDetailCard({ entry: initial }: { entry: VocabularyEntry }) {
           value={note}
           onChange={(e) => setNote(e.target.value)}
           rows={3}
-          className="w-full rounded-xl border border-[var(--line)] bg-white/70 p-3 font-[family-name:var(--font-ui)] text-sm"
+          className="w-full rounded-xl border border-[var(--line)] bg-[var(--surface-muted)] p-3 font-[family-name:var(--font-ui)] text-sm"
         />
         <button
           type="button"
           disabled={busy === "note"}
           onClick={() => patch({ action: "note", note })}
-          className="min-h-11 rounded-xl border border-[var(--line)] bg-white px-4 font-[family-name:var(--font-ui)] text-sm"
+          className="min-h-11 rounded-xl border border-[var(--line)] bg-[var(--surface)] px-4 font-[family-name:var(--font-ui)] text-sm"
         >
           Save note
         </button>
@@ -270,7 +270,7 @@ export function WordDetailCard({ entry: initial }: { entry: VocabularyEntry }) {
       <div className="flex flex-wrap gap-2">
         <a
           href={`/audio?word=${entry.id}`}
-          className="inline-flex min-h-12 items-center rounded-xl bg-[var(--accent)] px-5 font-[family-name:var(--font-ui)] text-sm font-semibold text-white"
+          className="inline-flex min-h-12 items-center rounded-xl bg-[var(--accent)] px-5 font-[family-name:var(--font-ui)] text-sm font-semibold text-[var(--on-accent)]"
         >
           Play word lesson
         </a>
@@ -278,7 +278,7 @@ export function WordDetailCard({ entry: initial }: { entry: VocabularyEntry }) {
           type="button"
           disabled={busy === "favorite"}
           onClick={() => patch({ action: "favorite" })}
-          className="min-h-12 rounded-xl border border-[var(--line)] bg-white px-4 font-[family-name:var(--font-ui)] text-sm"
+          className="min-h-12 rounded-xl border border-[var(--line)] bg-[var(--surface)] px-4 font-[family-name:var(--font-ui)] text-sm"
         >
           {entry.isFavorite ? "Unfavorite" : "Favorite"}
         </button>
@@ -286,7 +286,7 @@ export function WordDetailCard({ entry: initial }: { entry: VocabularyEntry }) {
           type="button"
           disabled={busy === "regenerate"}
           onClick={() => patch({ action: "regenerate" })}
-          className="min-h-12 rounded-xl border border-[var(--line)] bg-white px-4 font-[family-name:var(--font-ui)] text-sm"
+          className="min-h-12 rounded-xl border border-[var(--line)] bg-[var(--surface)] px-4 font-[family-name:var(--font-ui)] text-sm"
         >
           {busy === "regenerate" ? "Regenerating…" : "Regenerate"}
         </button>
@@ -294,7 +294,7 @@ export function WordDetailCard({ entry: initial }: { entry: VocabularyEntry }) {
           type="button"
           disabled={busy === "delete"}
           onClick={remove}
-          className="min-h-12 rounded-xl border border-red-200 bg-red-50 px-4 font-[family-name:var(--font-ui)] text-sm text-[var(--danger)]"
+          className="min-h-12 rounded-xl border border-[var(--danger)]/35 bg-[var(--danger-soft)] px-4 font-[family-name:var(--font-ui)] text-sm text-[var(--danger)]"
         >
           Delete
         </button>

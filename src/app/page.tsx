@@ -26,13 +26,13 @@ export default async function HomePage() {
       <div className="flex flex-col gap-3 sm:flex-row">
         <Link
           href="/audio"
-          className="inline-flex min-h-12 items-center justify-center rounded-xl bg-[var(--accent)] px-5 font-[family-name:var(--font-ui)] text-sm font-semibold text-[#fffdf9]"
+          className="inline-flex min-h-12 items-center justify-center rounded-xl bg-[var(--accent)] px-5 font-[family-name:var(--font-ui)] text-sm font-semibold text-[var(--on-accent)]"
         >
           Start audio review
         </Link>
         <Link
           href="/library"
-          className="inline-flex min-h-12 items-center justify-center rounded-xl border border-[var(--line)] bg-white px-5 font-[family-name:var(--font-ui)] text-sm font-medium text-[var(--ink)]"
+          className="inline-flex min-h-12 items-center justify-center rounded-xl border border-[var(--line)] bg-[var(--surface)] px-5 font-[family-name:var(--font-ui)] text-sm font-medium text-[var(--ink)]"
         >
           Browse library
         </Link>
@@ -47,7 +47,7 @@ export default async function HomePage() {
         ].map((stat) => (
           <div
             key={stat.label}
-            className="rounded-2xl border border-[var(--line)] bg-white/50 px-4 py-3"
+            className="rounded-2xl border border-[var(--line)] bg-[var(--surface-muted)] px-4 py-3"
           >
             <p className="font-[family-name:var(--font-display)] text-2xl font-semibold">
               {stat.value}

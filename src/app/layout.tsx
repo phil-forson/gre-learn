@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { DM_Sans, Fraunces, Source_Serif_4 } from "next/font/google";
 import { AppNav } from "@/components/navigation/AppNav";
+import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import "./globals.css";
 
 const display = Fraunces({
@@ -30,20 +31,27 @@ export const viewport: Viewport = {
   themeColor: "#1f4b3f",
 };
 
+const themeBootScript = `(function(){try{var k="gre-learn-theme";var s=localStorage.getItem(k);var p=s==="light"||s==="dark"||s==="system"?s:"system";var d=p==="dark"||(p==="system"&&window.matchMedia("(prefers-color-scheme: dark)").matches);document.documentElement.dataset.theme=d?"dark":"light";document.documentElement.style.colorScheme=d?"dark":"light";}catch(e){}})();`;
+
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeBootScript }} />
+      </head>
       <body
         className={`${display.variable} ${body.variable} ${ui.variable} antialiased bg-grain`}
       >
-        <div className="mx-auto min-h-dvh w-full max-w-3xl px-4 pb-28 pt-4 sm:px-6">
-          <AppNav />
-          <main>{children}</main>
-        </div>
+        <ThemeProvider>
+          <div className="mx-auto min-h-dvh w-full max-w-3xl px-4 pb-28 pt-4 sm:px-6">
+            <AppNav />
+            <main>{children}</main>
+          </div>
+        </ThemeProvider>
       </body>
     </html>
   );

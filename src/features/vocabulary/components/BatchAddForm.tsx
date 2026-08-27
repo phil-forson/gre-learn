@@ -68,12 +68,12 @@ export function BatchAddForm() {
         onChange={(e) => setText(e.target.value)}
         rows={5}
         placeholder={"laconic\nobdurate\npellucid"}
-        className="w-full rounded-xl border border-[var(--line)] bg-white/70 p-3 font-[family-name:var(--font-ui)] text-sm"
+        className="w-full rounded-xl border border-[var(--line)] bg-[var(--surface-muted)] p-3 font-[family-name:var(--font-ui)] text-sm"
       />
       <button
         type="submit"
         disabled={pending}
-        className="min-h-11 rounded-xl border border-[var(--line)] bg-white px-4 font-[family-name:var(--font-ui)] text-sm font-medium disabled:opacity-60"
+        className="min-h-11 rounded-xl border border-[var(--line)] bg-[var(--surface)] px-4 font-[family-name:var(--font-ui)] text-sm font-medium disabled:opacity-60"
       >
         {pending ? "Processing…" : "Add batch"}
       </button>

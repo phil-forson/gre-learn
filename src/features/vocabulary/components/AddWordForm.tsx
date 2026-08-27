@@ -80,12 +80,12 @@ export function AddWordForm({ autofocus = true }: Props) {
           autoFocus={autofocus}
           autoComplete="off"
           placeholder="Add a word you just encountered…"
-          className="min-h-12 flex-1 rounded-xl border border-[var(--line)] bg-white/70 px-4 font-[family-name:var(--font-ui)] text-base text-[var(--ink)] placeholder:text-[var(--ink-muted)]"
+          className="min-h-12 flex-1 rounded-xl border border-[var(--line)] bg-[var(--surface-muted)] px-4 font-[family-name:var(--font-ui)] text-base text-[var(--ink)] placeholder:text-[var(--ink-muted)]"
         />
         <button
           type="submit"
           disabled={pending}
-          className="min-h-12 rounded-xl bg-[var(--accent)] px-5 font-[family-name:var(--font-ui)] text-sm font-semibold text-[#fffdf9] disabled:opacity-60"
+          className="min-h-12 rounded-xl bg-[var(--accent)] px-5 font-[family-name:var(--font-ui)] text-sm font-semibold text-[var(--on-accent)] disabled:opacity-60"
         >
           {pending ? "Adding…" : "Add"}
         </button>
