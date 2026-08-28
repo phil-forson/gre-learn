@@ -114,6 +114,15 @@ function normalizeSpeakingProgress(raw: SpeakingProgress): SpeakingProgress {
   };
 }
 
+function normalizePianoSkillProgress(
+  raw: PianoSkillProgress,
+): PianoSkillProgress {
+  return {
+    ...raw,
+    keysCompleted: Array.isArray(raw.keysCompleted) ? raw.keysCompleted : [],
+  };
+}
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -187,7 +196,9 @@ function parseStore(raw: string): StoreShape {
       ? (record.pianoSessions as PracticeSession[])
       : [],
     pianoSkillProgress: Array.isArray(record.pianoSkillProgress)
-      ? (record.pianoSkillProgress as PianoSkillProgress[])
+      ? (record.pianoSkillProgress as PianoSkillProgress[]).map(
+          normalizePianoSkillProgress,
+        )
       : [],
     youtubeNotes: Array.isArray(record.youtubeNotes)
       ? (record.youtubeNotes as YoutubeNote[])

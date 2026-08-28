@@ -22,10 +22,11 @@ After any implementation batch — especially persistence, APIs, generation, aud
 1. Diff / claimed change set from the parent prompt
 2. `CURSOR_GRE_VOCAB_BUILD_SPEC.md` invariants (normalize/dedupe, validate before persist, contentVersion/hash, audio tied to content, graceful failures)
 3. Existing patterns in `features/`, repositories, Zod schemas, and tests
+4. **Live runtime evidence** when the change has UI or write APIs — terminal/dev-server console, not static reading alone
 
 ## Review protocol
 
-Work through every item. Skip nothing that applies.
+Work through every item. **Skip nothing that applies.** Static “PASS” without the mandatory runtime/Firestore checks below is an incomplete review.
 
 ### A. Structural integrity
 
@@ -62,11 +63,45 @@ Fail the review (High) if any of these appear in the diff:
 
 Correct pattern: keep list/page shells as Server Components; put all event handlers inside `"use client"` leaves; pass only serializable props (strings, numbers, plain objects/arrays).
 
+### C3. Firestore / persistence write safety (mandatory — never skip)
+
+Whenever the diff touches Firebase repositories, `.set()` / `.update()` / batch writes, or optional Zod fields that become document properties:
+
+- **Undefined fields:** Firestore rejects `undefined` values. Confirm every write path strips or omits `undefined` (e.g. `stripUndefinedDeep` before `.set()`, or build objects without optional keys). Optional Zod `.optional()` fields are a common footgun — treat as High if a write can include `notes: undefined`, `url: undefined`, etc.
+- **Null vs undefined:** `null` is allowed; `undefined` is not. Don’t confuse them.
+- **Nested arrays/objects:** Check nested completions, segments, prompts — not only top-level keys.
+- **IDOR on upsert by doc id:** load existing; reject mismatched `userId`; preserve `id`/`userId` on update (parity with local).
+- **Additive local store:** missing new keys → `[]` / defaults; never wipe vocab/grammar/audio arrays.
+- **Tests must use isolated `dataDir`** — never point at production `data/store.json`.
+
+Fail (High) if Firebase write paths can persist `undefined`, or if the reviewer only “assumed” they were fine without checking call sites.
+
 ### D. Tests & proof
 
 - Are there tests for the new edge cases, or only happy path?
 - Run or reason about relevant unit/integration coverage; note what was not executed
 - For UI boundary bugs: confirm the interactive component is client-marked and that server parents do not attach handlers
+- For Firestore writes: prefer a unit that asserts stripped payloads / rejects undefined nested fields
+
+### E. Runtime / console verification (mandatory — never skip for interactive or write flows)
+
+If the change adds or modifies pages, client actions, or mutating APIs (`POST`/`PATCH`/`PUT`/`DELETE`):
+
+1. Read the **dev-server / terminal console** (or ask parent for it) for the feature’s happy-path interaction — e.g. button click → API → persist.
+2. Treat `[app-error]`, uncaught exceptions, 500s on those routes, and Firestore “not a valid document” errors as **High/Critical blockers**, even if unit tests passed.
+3. Do **not** clear a review as PASS solely because static code “looks correct” when an interactive write path was not exercised or console errors were ignored.
+4. If you cannot access a running console, mark the Edge cases checklist item unchecked and verdict at best **PASS WITH NOTES** with explicit “runtime console not verified.”
+
+This section exists because unit/integration tests with mocks often miss Firestore `undefined` rejection and Next.js Server/Client boundary failures that only appear on first user click.
+
+### F. Learning content sources (mandatory for curriculum changes)
+
+When the diff touches piano curriculum, English path curriculum, placement banks, or other agent-authored teaching copy (see `verifiable-learning-sources.mdc`):
+
+- Every **factual teaching claim** (fingerings, tempos, grammar rules, CEFR scope, pass thresholds) must have a `LearningSource` with a public **https** URL.
+- Fail (High) if sources are missing, URLs are placeholders, or tests assert invented values without an external reference in the same change.
+- Spot-check: does the cited page actually support the claim (e.g. B major RH is 1-2-3-1-2-3-4-5, not agent heuristics)?
+- User-pasted YouTube notes are fine without agent sources; **seed/curriculum files are not**.
 
 ## Report format
 
@@ -81,6 +116,11 @@ PASS | PASS WITH NOTES | BLOCKERS
 
 ## Edge cases checked
 - [x] / [ ] <item>
+- [x] / [ ] Firestore writes strip/omit undefined (nested too)
+- [x] / [ ] Runtime/dev console verified for interactive write paths (or explicitly NOT verified)
+- [x] / [ ] Learning items cite verifiable https sources (curriculum/placement changes)
+- [x] / [ ] Tempo and numeric claims consistent across UI + steps (learning-consistency.mdc)
+- [x] / [ ] Today blocks do not duplicate the same scale drill (scale vs jazz)
 
 ## Structures preserved
 - <what still holds>
@@ -92,7 +132,7 @@ PASS | PASS WITH NOTES | BLOCKERS
 Severity guide:
 
 - **Critical** — data loss, auth bypass, secrets, core loop broken
-- **High** — likely production bug or security hole under normal use
+- **High** — likely production bug or security hole under normal use (includes Firestore undefined write 500s and Server/Client handler crashes on click)
 - **Medium** — real edge case or maintainability/structure break
 - **Low** — polish / defense in depth
 

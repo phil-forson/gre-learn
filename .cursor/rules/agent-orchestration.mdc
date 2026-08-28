@@ -25,6 +25,8 @@ alwaysApply: true
 - Primary: `CURSOR_GRE_VOCAB_BUILD_SPEC.md`
 - Honor P0 over P1 over P2. Never let P2 delay P0.
 - Core loop: add word → enrich → persist → audio segments → review with synced transcript highlight.
+- **Learning content**: see `verifiable-learning-sources.mdc` — piano, English path, and curated vocab must cite online checkable sources; agents do not invent pedagogy.
+- **Consistency**: see `learning-consistency.mdc` — same BPM/numbers everywhere; no duplicate block drills.
 
 ## Completion phrases (required)
 

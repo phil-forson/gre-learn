@@ -15,7 +15,7 @@ import {
   createYoutubeNote,
   mapNoteToPlan,
 } from "@/features/piano/services/notes-service";
-import { markSkillPracticed } from "@/features/piano/services/skill-service";
+import { markKeyComplete, markSkillPracticed } from "@/features/piano/services/skill-service";
 import type { VocabularyEntry } from "@/features/vocabulary/types";
 import { createId, nowIso } from "@/lib/utils";
 
@@ -91,15 +91,29 @@ describe("piano persistence integration", () => {
     const plan1 = await getTodayPlan();
     expect(plan1.blocks).toHaveLength(5);
     expect(plan1.totalMinutes).toBe(60);
+    for (const block of plan1.blocks) {
+      expect(block.skill.id).toMatch(/^sk_/);
+      expect(block.detail.exercise.length).toBeGreaterThan(0);
+      expect(block.detail.focusKey.length).toBeGreaterThan(0);
+      expect(block.detail.steps.length).toBeGreaterThan(0);
+    }
+
+    const scaleBlock = plan1.blocks.find((b) => b.id === "scale_mode_lab");
+    expect(scaleBlock?.detail.fingering).toBeTruthy();
+
+    const gospelSkillId = plan1.blocks.find((b) => b.id === "gospel_core")
+      ?.skill.id;
+    expect(gospelSkillId).toBeTruthy();
 
     const session = await completeSessionBlock({
       blockId: "gospel_core",
-      skillIds: ["sk_gospel_514"],
+      skillIds: [gospelSkillId!],
       localDay: plan1.localDay,
     });
     expect(session.blocksCompleted.map((b) => b.blockId)).toContain(
       "gospel_core",
     );
+    expect(session.skillIdsTouched).toContain(gospelSkillId);
     expect(session.durationMin).toBe(20);
 
     const plan2 = await getTodayPlan(
@@ -107,6 +121,26 @@ describe("piano persistence integration", () => {
     );
     const gospel = plan2.blocks.find((b) => b.id === "gospel_core");
     expect(gospel?.completed).toBe(true);
+    expect(gospel?.skill.id).toBe(gospelSkillId);
+  });
+
+  it("tracks major keys per skill", async () => {
+    const plan = await getTodayPlan();
+    const scale = plan.blocks.find((b) => b.id === "scale_mode_lab");
+    expect(scale).toBeTruthy();
+
+    const progress = await markKeyComplete(scale!.skill.id, {
+      key: "B",
+    });
+    expect(progress.keysCompleted).toContain("B");
+
+    const plan2 = await getTodayPlan();
+    const scale2 = plan2.blocks.find((b) => b.id === "scale_mode_lab");
+    expect(scale2?.detail.keysCompleted).toContain("B");
+    if (scale2?.detail.fingering) {
+      expect(scale2.detail.fingering.key).toBe(scale2.detail.focusKey);
+      expect(scale2.detail.fingering.rightHand.notes[0]).toBeTruthy();
+    }
   });
 
   it("creates and maps YouTube notes", async () => {

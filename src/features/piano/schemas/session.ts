@@ -26,6 +26,7 @@ export const completeSessionBlockSchema = z
     blockId: z.string().min(1).max(80),
     notes: z.string().max(2000).optional(),
     skillIds: z.array(z.string().min(1)).max(20).optional(),
+    markKeyDone: z.string().min(1).max(8).optional(),
     localDay: z
       .string()
       .regex(/^\d{4}-\d{2}-\d{2}$/)
@@ -40,9 +41,23 @@ export const pianoSkillProgressSchema = z.object({
   status: z.enum(PIANO_SKILL_STATUSES),
   timesPracticed: z.number().int().min(0).max(10_000),
   lastPracticedAt: z.string().min(1).nullable(),
+  keysCompleted: z.preprocess(
+    (val) => (Array.isArray(val) ? val : []),
+    z.array(z.string().min(1).max(8)).max(24),
+  ),
   dateCreated: z.string().min(1),
   dateUpdated: z.string().min(1),
 });
+
+export const markKeyCompleteSchema = z
+  .object({
+    key: z.string().min(1).max(8),
+    localDay: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/)
+      .optional(),
+  })
+  .strict();
 
 export const markSkillPracticedSchema = z
   .object({

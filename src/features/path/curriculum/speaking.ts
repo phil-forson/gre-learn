@@ -1,4 +1,11 @@
 import type { CefrLevel } from "@/features/path/types";
+import type { LearningSource } from "@/lib/learning-source";
+import { CEFR_FRAMEWORK, ENGLISH_PATH_SOURCES } from "./sources";
+
+const SPEAKING_UNIT_SOURCES: LearningSource[] = [
+  CEFR_FRAMEWORK,
+  ENGLISH_PATH_SOURCES.britishCouncilSpeaking,
+];
 
 export type CurriculumUnitMapEntry = {
   order: number;
@@ -10,6 +17,8 @@ export type CurriculumUnitMapEntry = {
   cefrRange: string;
   /** MVP ships units 1–5 only. */
   seeded: boolean;
+  /** Required when unit copy teaches facts — see verifiable-learning-sources.mdc */
+  sources?: LearningSource[];
 };
 
 /**
@@ -24,6 +33,7 @@ export const SPEAKING_CURRICULUM: readonly CurriculumUnitMapEntry[] = [
     cefrBand: "A2",
     cefrRange: "A2",
     seeded: true,
+    sources: SPEAKING_UNIT_SOURCES,
   },
   {
     order: 2,
@@ -32,6 +42,7 @@ export const SPEAKING_CURRICULUM: readonly CurriculumUnitMapEntry[] = [
     cefrBand: "A2",
     cefrRange: "A2–B1",
     seeded: true,
+    sources: SPEAKING_UNIT_SOURCES,
   },
   {
     order: 3,
@@ -40,6 +51,7 @@ export const SPEAKING_CURRICULUM: readonly CurriculumUnitMapEntry[] = [
     cefrBand: "B1",
     cefrRange: "B1",
     seeded: true,
+    sources: SPEAKING_UNIT_SOURCES,
   },
   {
     order: 4,
@@ -48,6 +60,7 @@ export const SPEAKING_CURRICULUM: readonly CurriculumUnitMapEntry[] = [
     cefrBand: "B1",
     cefrRange: "B1",
     seeded: true,
+    sources: SPEAKING_UNIT_SOURCES,
   },
   {
     order: 5,
@@ -56,6 +69,7 @@ export const SPEAKING_CURRICULUM: readonly CurriculumUnitMapEntry[] = [
     cefrBand: "B1",
     cefrRange: "B1–B2",
     seeded: true,
+    sources: SPEAKING_UNIT_SOURCES,
   },
   {
     order: 6,
@@ -64,6 +78,7 @@ export const SPEAKING_CURRICULUM: readonly CurriculumUnitMapEntry[] = [
     cefrBand: "B2",
     cefrRange: "B2",
     seeded: false,
+    sources: SPEAKING_UNIT_SOURCES,
   },
   {
     order: 7,
@@ -72,6 +87,7 @@ export const SPEAKING_CURRICULUM: readonly CurriculumUnitMapEntry[] = [
     cefrBand: "B2",
     cefrRange: "B2",
     seeded: false,
+    sources: SPEAKING_UNIT_SOURCES,
   },
   {
     order: 8,
@@ -80,6 +96,7 @@ export const SPEAKING_CURRICULUM: readonly CurriculumUnitMapEntry[] = [
     cefrBand: "B2",
     cefrRange: "B2–C1",
     seeded: false,
+    sources: SPEAKING_UNIT_SOURCES,
   },
   {
     order: 9,
@@ -88,6 +105,7 @@ export const SPEAKING_CURRICULUM: readonly CurriculumUnitMapEntry[] = [
     cefrBand: "B2",
     cefrRange: "B2–C1",
     seeded: false,
+    sources: SPEAKING_UNIT_SOURCES,
   },
   {
     order: 10,
@@ -96,6 +114,7 @@ export const SPEAKING_CURRICULUM: readonly CurriculumUnitMapEntry[] = [
     cefrBand: "C1",
     cefrRange: "C1",
     seeded: false,
+    sources: SPEAKING_UNIT_SOURCES,
   },
 ] as const;
 

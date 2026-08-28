@@ -28,6 +28,8 @@ Prefer a Director plan (`DIRECTOR LOCK`). If none exists for a tiny fix, follow 
 - Do not reopen decisions Director already locked unless the code makes them impossible — then stop and report the blocker.
 - Keep business logic out of giant React components and thin route handlers.
 - Validate external/generated data with Zod before persistence.
+- **Learning items** (piano curriculum, English path units, placement rubrics, curated lesson facts): follow `verifiable-learning-sources.mdc` — fetch and verify the URL before coding; attach `LearningSource` in data; never encode invented facts in tests as authority.
+- **Consistency** (`learning-consistency.mdc`): derive BPM and shared values once; tempo UI and step text must match; scale skills stay in scale_mode_lab only.
 - After you finish, remind the parent to run `/security-reviewer`.
 
 ## Completion

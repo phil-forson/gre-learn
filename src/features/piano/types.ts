@@ -66,6 +66,8 @@ export type PianoSkillProgress = {
   status: PianoSkillStatus;
   timesPracticed: number;
   lastPracticedAt: string | null;
+  /** Major keys marked complete for this skill (when skill tracks keys). */
+  keysCompleted: string[];
   dateCreated: string;
   dateUpdated: string;
 };
@@ -94,6 +96,26 @@ export type PianoDomain = {
   description: string;
 };
 
+import type { LearningSource } from "@/lib/learning-source";
+
+/** Concrete lesson body shown on Piano Today blocks. */
+export type PianoSkillLesson = {
+  why: string;
+  steps: string[];
+  exercise: string;
+  passRule: string;
+  tip?: string;
+  /** Online sources backing factual claims in this lesson. */
+  sources?: LearningSource[];
+  /** Optional explicit tempo when not inferred from scale/key work. */
+  tempo?: {
+    startBpm: number;
+    targetBpm: number;
+    noteValue: string;
+    howToUse: string;
+  };
+};
+
 export type PianoSkill = {
   id: string;
   slug: string;
@@ -104,6 +126,9 @@ export type PianoSkill = {
   prereqIds: string[];
   weekHint?: number;
   practicePrompt: string;
+  lesson: PianoSkillLesson;
+  /** Optional preferred keys; Today still uses the day-cycle keysToday. */
+  keysHint?: string[];
 };
 
 export type FocusMix = {

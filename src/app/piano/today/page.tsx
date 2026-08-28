@@ -20,36 +20,37 @@ export default async function PianoTodayPage() {
           Today&apos;s 60
         </h1>
         <p className="max-w-lg text-[var(--ink-muted)]">
-          {plan.phase?.title ?? "Active phase"} — complete each block in order.
-          Timer discipline beats noodling.
+          {plan.phase?.title ?? "Active phase"} — work through each lesson, then
+          mark the key or block done. No abbreviations without explanation
+          below each block.
         </p>
         <p className="font-[family-name:var(--font-ui)] text-sm text-[var(--accent)]">
           {plan.completedMinutes} / {plan.totalMinutes} minutes logged
         </p>
+        {plan.keysOverview.total > 0 ? (
+          <p className="font-[family-name:var(--font-ui)] text-sm text-[var(--ink-muted)]">
+            Major keys (tracked): {plan.keysOverview.completed.length} /{" "}
+            {plan.keysOverview.total} done
+            {plan.keysOverview.remaining.length > 0
+              ? ` · Next up: ${plan.keysOverview.remaining.slice(0, 3).join(", ")}`
+              : " · All 12 keys complete — maintenance mode"}
+          </p>
+        ) : null}
       </section>
 
-      <TodayChecklist blocks={plan.blocks} localDay={plan.localDay} />
-
-      <section className="space-y-3">
-        <h2 className="font-[family-name:var(--font-display)] text-xl font-semibold">
-          Suggested skills
-        </h2>
-        <ul className="space-y-2">
-          {plan.suggestedSkills.map((skill) => (
-            <li
-              key={skill.id}
-              className="rounded-xl border border-[var(--line)] bg-[var(--surface-muted)] px-4 py-3"
-            >
-              <p className="font-[family-name:var(--font-ui)] text-sm font-semibold">
-                {skill.title}
-              </p>
-              <p className="mt-1 text-sm text-[var(--ink-muted)]">
-                {skill.practicePrompt}
-              </p>
-            </li>
-          ))}
-        </ul>
-      </section>
+      <TodayChecklist
+        blocks={plan.blocks.map((b) => ({
+          id: b.id,
+          label: b.label,
+          minutes: b.minutes,
+          description: b.description,
+          completed: b.completed,
+          skillId: b.skill.id,
+          skillTitle: b.skill.title,
+          detail: b.detail,
+        }))}
+        localDay={plan.localDay}
+      />
 
       {plan.notePrompts.length > 0 ? (
         <section className="space-y-3">

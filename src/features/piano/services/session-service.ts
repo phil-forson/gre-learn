@@ -8,6 +8,8 @@ import type { PracticeSession } from "@/features/piano/types";
 import { AppError } from "@/lib/errors";
 import { createId, nowIso } from "@/lib/utils";
 import { localDayKey } from "@/features/notifications/services/digest-builder";
+import { markKeyComplete } from "@/features/piano/services/skill-service";
+import { KEY_TRACKING_SKILL_IDS } from "@/features/piano/services/lesson-detail";
 import { getOrCreatePianoProfile } from "./profile-service";
 
 function getUserId(): string {
@@ -76,7 +78,9 @@ export async function completeSessionBlock(
         {
           blockId: block.id,
           completedAt: now,
-          notes: parsed.data.notes,
+          ...(parsed.data.notes !== undefined
+            ? { notes: parsed.data.notes }
+            : {}),
         },
       ];
 
@@ -87,11 +91,23 @@ export async function completeSessionBlock(
     .filter((b) => blocksCompleted.some((c) => c.blockId === b.id))
     .reduce((sum, b) => sum + b.minutes, 0);
 
-  return getPianoRepository().upsertSession({
+  const updated = await getPianoRepository().upsertSession({
     ...session,
     blocksCompleted,
     skillIdsTouched: [...skillIds],
     durationMin,
     dateUpdated: now,
   });
+
+  const primarySkillId = parsed.data.skillIds?.[0];
+  const keyToMark = parsed.data.markKeyDone;
+  if (
+    primarySkillId &&
+    keyToMark &&
+    KEY_TRACKING_SKILL_IDS.has(primarySkillId)
+  ) {
+    await markKeyComplete(primarySkillId, { key: keyToMark, localDay });
+  }
+
+  return updated;
 }

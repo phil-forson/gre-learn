@@ -1,0 +1,45 @@
+---
+description: Learning UI must be internally consistent — same numbers, no duplicate block drills
+alwaysApply: true
+---
+
+# Learning Consistency (top priority)
+
+**Consistency ranks above convenience.** If the user sees conflicting numbers or duplicate drills in one session, the product is wrong even when individual facts are correct.
+
+## One source per displayed value
+
+Never hardcode the same fact in two places (seed tempo + per-key table + step strings). Derive once, render everywhere.
+
+| Value | Single source |
+| :---- | :------------ |
+| Scale start/target BPM | `getMajorScaleFingering(key)` via `resolveLessonTempo()` in `lesson-detail.ts` |
+| Finger numbers | `scale-fingerings.ts` → fingering chart only |
+| Today's key | `pickFocusKey()` — same key across blocks that share key work |
+
+**Tempo box, steps, exercise, and pass rule must show the same BPM** for a given block. If step 3 says target 96 BPM, the Tempo card must say 96 — not 104 from a stale seed field.
+
+## Forbidden
+
+- Static `lesson.tempo` in seed overriding per-key tempo for key-tracking scale skills
+- Copy-pasted BPM in prose that is not built from the same resolver
+- Two Today blocks assigned the same scale drill on the same day
+
+## Block assignment
+
+Each 60-min block has a distinct job:
+
+| Block | Purpose |
+| :---- | :------ |
+| Scale / mode lab | Scales, modes, RCM scale requirements |
+| Jazz application | Harmony **application** (2-5-1, voicings, swing) — **not** a second scale lab |
+| Gospel core | Church patterns, LH, accompaniment |
+| Key / chord lab | Voicings, progressions, geography |
+| Ear or reading | Ear / sight reading |
+
+Scale/key-tracking skills (`sk_major_scale_lab`, `sk_rcm_scales`, etc.) belong in **scale_mode_lab only**, not jazz_application.
+
+## Agent duties
+
+- **Implementer**: Add a test when introducing any derived display value (BPM, key, fingering).
+- **Security Reviewer**: Fail if the same session shows mismatched BPM or duplicate scale blocks without user-facing justification.

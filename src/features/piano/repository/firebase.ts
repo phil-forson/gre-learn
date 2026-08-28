@@ -15,8 +15,13 @@ import type {
 import { DAILY_TEMPLATE } from "@/features/piano/curriculum";
 import { getDb } from "@/lib/db/firebase-admin";
 import { AppError } from "@/lib/errors";
-import { createId, nowIso } from "@/lib/utils";
+import { createId, nowIso, stripUndefinedDeep } from "@/lib/utils";
 import type { PianoRepository } from "./types";
+
+/** Firestore rejects `undefined` field values — always strip before `.set()`. */
+function firestoreDoc<T>(data: T): T {
+  return stripUndefinedDeep(data);
+}
 
 const COL = {
   pianoProfiles: "pianoProfiles",
@@ -123,11 +128,17 @@ export class FirebasePianoRepository implements PianoRepository {
         dateCreated: data.dateCreated || nowIso(),
         dateUpdated: nowIso(),
       });
-      await this.db.collection(COL.pianoProfiles).doc(repaired.id).set(repaired);
+      await this.db
+        .collection(COL.pianoProfiles)
+        .doc(repaired.id)
+        .set(firestoreDoc(repaired));
       return repaired;
     }
     const fresh = assertValidProfile(defaultProfile(userId));
-    await this.db.collection(COL.pianoProfiles).doc(fresh.id).set(fresh);
+    await this.db
+      .collection(COL.pianoProfiles)
+      .doc(fresh.id)
+      .set(firestoreDoc(fresh));
     return fresh;
   }
 
@@ -148,10 +159,16 @@ export class FirebasePianoRepository implements PianoRepository {
         userId: data.userId,
         dateCreated: data.dateCreated || valid.dateCreated,
       });
-      await this.db.collection(COL.pianoProfiles).doc(merged.id).set(merged);
+      await this.db
+        .collection(COL.pianoProfiles)
+        .doc(merged.id)
+        .set(firestoreDoc(merged));
       return merged;
     }
-    await this.db.collection(COL.pianoProfiles).doc(valid.id).set(valid);
+    await this.db
+      .collection(COL.pianoProfiles)
+      .doc(valid.id)
+      .set(firestoreDoc(valid));
     return valid;
   }
 
@@ -194,7 +211,10 @@ export class FirebasePianoRepository implements PianoRepository {
         }
       : session;
     const valid = assertValidSession(next);
-    await this.db.collection(COL.pianoSessions).doc(valid.id).set(valid);
+    await this.db
+      .collection(COL.pianoSessions)
+      .doc(valid.id)
+      .set(firestoreDoc(valid));
     return valid;
   }
 
@@ -233,7 +253,7 @@ export class FirebasePianoRepository implements PianoRepository {
     await this.db
       .collection(COL.pianoSkillProgress)
       .doc(valid.id)
-      .set(valid);
+      .set(firestoreDoc(valid));
     return valid;
   }
 
@@ -271,10 +291,16 @@ export class FirebasePianoRepository implements PianoRepository {
         userId: data.userId,
         dateCreated: data.dateCreated || valid.dateCreated,
       });
-      await this.db.collection(COL.youtubeNotes).doc(merged.id).set(merged);
+      await this.db
+        .collection(COL.youtubeNotes)
+        .doc(merged.id)
+        .set(firestoreDoc(merged));
       return merged;
     }
-    await this.db.collection(COL.youtubeNotes).doc(valid.id).set(valid);
+    await this.db
+      .collection(COL.youtubeNotes)
+      .doc(valid.id)
+      .set(firestoreDoc(valid));
     return valid;
   }
 }

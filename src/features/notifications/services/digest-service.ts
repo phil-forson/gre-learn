@@ -18,7 +18,7 @@ import type {
   DigestVocabSnippet,
   NotificationPreferences,
 } from "@/features/notifications/types";
-import { getDailyTemplate, getSkill } from "@/features/piano/catalog";
+import { getSkill } from "@/features/piano/catalog";
 import { getPianoRepository } from "@/features/piano/repository";
 import { resolveContinueTarget } from "@/features/path/services/continue-service";
 import { getVocabularyRepository } from "@/features/vocabulary/repository";
@@ -145,7 +145,7 @@ export async function collectDigestActivity(
       if (hasLoggedPiano) {
         const skillLabel =
           session?.skillIdsTouched
-            .map((id) => getSkill(id)?.title)
+            ?.map((id) => getSkill(id)?.title)
             .find(Boolean) ??
           mappedPrompts[0]?.practicePrompts[0]?.slice(0, 40) ??
           "Practice today";

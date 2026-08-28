@@ -29,15 +29,22 @@ describe("piano catalog", () => {
     ]);
   });
 
-  it("seeds at least 40 skills with valid prereqs", () => {
+  it("seeds 58 skills with valid prereqs and lesson shape", () => {
     const skills = listSkills();
-    expect(skills.length).toBeGreaterThanOrEqual(40);
+    expect(skills).toHaveLength(58);
     const ids = new Set(skills.map((s) => s.id));
     for (const skill of skills) {
       for (const prereq of skill.prereqIds) {
         expect(ids.has(prereq)).toBe(true);
       }
       expect(getSkill(skill.id)?.slug).toBe(skill.slug);
+      expect(skill.lesson.why.length).toBeGreaterThan(0);
+      expect(skill.lesson.steps.length).toBeGreaterThan(0);
+      expect(skill.lesson.exercise.length).toBeGreaterThan(0);
+      expect(skill.lesson.passRule.length).toBeGreaterThan(0);
+      for (const step of skill.lesson.steps) {
+        expect(step.length).toBeGreaterThan(0);
+      }
     }
   });
 

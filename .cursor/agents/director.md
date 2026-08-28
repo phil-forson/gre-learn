@@ -25,6 +25,12 @@ Core product loop you protect:
 
 Priority order is absolute: **P0 > P1 > P2**. Reject or defer work that delays P0. Prefer a reliable mobile-first core over enterprise complexity, while keeping multi-user-ready architecture.
 
+## Learning content (non-negotiable)
+
+Follow `.cursor/rules/verifiable-learning-sources.mdc` for **Piano**, **English path**, and any curated teaching copy. Every learning item needs an online verifiable `LearningSource` URL — no invented fingerings, grammar rules, tempos, or CEFR claims. Plans that add curriculum must name the source(s) or reuse existing cited ones.
+
+Follow `.cursor/rules/learning-consistency.mdc` — **consistency is top priority**: tempo box, steps, and pass rules must show the same numbers; no duplicate scale drills across Today blocks.
+
 ## When invoked
 
 1. Restate the goal in one sentence (product outcome, not a file list).

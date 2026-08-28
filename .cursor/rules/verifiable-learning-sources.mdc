@@ -1,0 +1,61 @@
+---
+description: Every learning item must cite an online verifiable source — no invented pedagogy or facts
+alwaysApply: true
+---
+
+# Verifiable Learning Sources
+
+Agents **must not invent** pedagogical facts, fingerings, grammar rules, CEFR mappings, tempos, pass criteria, definitions, or exercise instructions. Every **learning item** shown to the user needs an **online, checkable source**.
+
+## What counts as a learning item
+
+Anything the user is taught or asked to practice:
+
+- Piano: scale fingerings, tempos, lesson steps, pass rules, mode/key facts
+- English path: unit scope, grammar explanations, frame patterns, placement rubrics, CEFR band claims
+- Vocabulary: definitions, usage notes, mnemonics, example sentences (when curated in seed/catalog)
+
+User-generated content (saved words, YouTube notes they pasted) is exempt. **Agent-authored curriculum is not.**
+
+## Required source shape
+
+Store sources in code as `LearningSource` (`src/lib/learning-source.ts`):
+
+```typescript
+{
+  title: string;       // e.g. "pianoscales.org — B major"
+  url: string;         // https://… public URL the user can open
+  note?: string;       // what this source backs (fingerings, tempo, etc.)
+}
+```
+
+- **`url` must be a real https link** — not "RCM", "standard pedagogy", or "common knowledge".
+- **Verify before shipping**: open/search the URL (or equivalent official doc) and confirm the claim matches.
+- **Tests must not be the source of truth** — never assert agent-invented facts without an external reference in the same PR.
+
+## Forbidden
+
+- Heuristic rules ("5-sharp keys start on 2") without a chart citation
+- Comments like `RCM-style` with no RCM URL
+- Duplicating wrong data into tests to make CI pass
+- LLM-generated lesson bodies saved as curriculum without a cited syllabus/link
+
+## Where this applies
+
+| Area | Typical files |
+| :--- | :------------ |
+| Piano curriculum | `src/features/piano/curriculum/**`, `lesson-detail.ts`, `seed.ts` |
+| English path | `src/features/path/curriculum/**`, `placement/**`, path catalog copy that teaches |
+| Shared | `src/lib/learning-source.ts` |
+
+## Agent duties
+
+| Agent | Duty |
+| :---- | :--- |
+| **Director** | Every curriculum task lists required sources or "reuse existing cited source". Block plans that invent facts. |
+| **Implementer** | Add/update `sources` on learning items; fetch and verify URLs; add tests that check source URLs exist, not invented fingerings. |
+| **Security Reviewer** | Reject curriculum changes with missing URLs, broken links, or claims that don't match the cited page. |
+
+## When no public URL exists
+
+Stop and ask the user for an official PDF, book edition, or link — **do not guess**. Temporary user-supplied text (YouTube note) may be tagged `source: user` and is not agent authority.
