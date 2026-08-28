@@ -131,7 +131,7 @@ export async function addVocabularyWord(
   }
 
   const now = nowIso();
-  let groupId: string | null = options?.groupId ?? null;
+  const groupId: string | null = options?.groupId ?? null;
   if (groupId) {
     const group = await repo.getWordGroup(userId, groupId);
     if (!group) {
@@ -196,7 +196,7 @@ export async function addManualVocabularyWord(
   const userId = getUserId();
   const existing = await repo.getByNormalizedWord(userId, normalized.normalized);
 
-  let groupId: string | null = options?.groupId ?? null;
+  const groupId: string | null = options?.groupId ?? null;
   if (groupId) {
     const group = await repo.getWordGroup(userId, groupId);
     if (!group) {
