@@ -11,7 +11,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "seed": "node --import tsx scripts/seed.ts"
+    "seed": "node --import tsx scripts/seed.ts",
+    "seed:path-profile": "node --import tsx scripts/seed-path-profile.ts"
   },
   "dependencies": {
     "firebase": "^11.10.0",

@@ -51,6 +51,9 @@ Default `.env.local` uses local mocks (already provided).
 | `FIREBASE_ADMIN_CLIENT_EMAIL` | Service account email |
 | `FIREBASE_ADMIN_PRIVATE_KEY` | Service account private key (`\n` escaped) |
 | `NEXT_PUBLIC_FIREBASE_*` | Client SDK config (optional for this MVP) |
+| `NEXT_PUBLIC_FIREBASE_VAPID_KEY` | Web Push certificate key for FCM digests |
+| `CRON_SECRET` | Bearer token for `POST /api/cron/daily-digest` |
+| `NOTIFICATIONS_PAIRING_SECRET` | Settings pairing code for enable / token / test send (falls back to accepting `CRON_SECRET` as Bearer) |
 | `DEFAULT_USER_ID` | Defaults to `default-user` |
 
 Never commit real secrets.
@@ -137,12 +140,21 @@ tests/unit|integration|e2e
 - Narration always comes from `buildAudioLessonScript(savedContent)` — not a second AI script
 - Favoriting / review counts do **not** invalidate audio; content regeneration does
 
+## PWA + Today’s English digests
+
+- Installable PWA shell (`manifest.webmanifest`, icons, `/sw.js`). Enable digests under **Settings**.
+- Opt-in evening push (default **20:00** local) via FCM when Firebase web config + `NEXT_PUBLIC_FIREBASE_VAPID_KEY` + Admin credentials are set.
+- Set `NOTIFICATIONS_PAIRING_SECRET` (recommended) and enter that code in Settings to enable digests, register a phone, or send a test. Cron remains `Authorization: Bearer $CRON_SECRET`.
+- Scheduler: `POST /api/cron/daily-digest` with `Authorization: Bearer $CRON_SECRET` (optional `?ignoreSendHour=1` for dry runs).
+- Quiet/empty days send a **specific next step** from the learning path continue target — not a vague nudge.
+- Media Session / home-screen widgets are still out of scope.
+
 ## Known limitations
 
 - Single default user (`DEFAULT_USER_ID`) — multi-user auth not wired yet (schema is user-scoped)
 - Browser speech has imperfect timing vs. server MP3s
 - Firestore list filtering for free-text is in-memory after a user query
-- No PWA / Media Session yet (P2)
+- Digests no-op gracefully when FCM/VAPID is not configured
 
 ## License
 

@@ -9,37 +9,68 @@ const links = [
   { href: "/library", label: "Library" },
   { href: "/audio", label: "Audio Review" },
   { href: "/favorites", label: "Favorites" },
+  { href: "/path", label: "English Path" },
+  { href: "/piano", label: "Piano" },
   { href: "/settings", label: "Settings" },
 ];
+
+function isPathChrome(pathname: string): boolean {
+  return (
+    pathname.startsWith("/path") ||
+    pathname.startsWith("/grammar") ||
+    pathname.startsWith("/sentence") ||
+    pathname.startsWith("/speaking")
+  );
+}
+
+function isPianoChrome(pathname: string): boolean {
+  return pathname.startsWith("/piano");
+}
 
 export function AppNav() {
   const pathname = usePathname();
   const hideChrome = pathname.startsWith("/audio") && pathname !== "/audio";
+  const pathChrome = isPathChrome(pathname);
+  const pianoChrome = isPianoChrome(pathname);
 
   if (hideChrome) return null;
+
+  const eyebrow = pianoChrome
+    ? "Practice"
+    : pathChrome
+      ? "American English"
+      : "GRE prep";
+  const brandHref = pianoChrome ? "/piano" : pathChrome ? "/path" : "/";
+  const brandTitle = pianoChrome
+    ? "Piano path"
+    : pathChrome
+      ? "Learning path"
+      : "GRE Learn";
 
   return (
     <header className="mb-8">
       <div className="flex items-end justify-between gap-4">
         <div>
           <p className="font-[family-name:var(--font-ui)] text-[11px] font-medium uppercase tracking-[0.22em] text-[var(--ink-muted)]">
-            GRE prep
+            {eyebrow}
           </p>
           <Link
-            href="/"
+            href={brandHref}
             className="font-[family-name:var(--font-display)] text-3xl font-semibold tracking-tight text-[var(--ink)] sm:text-4xl"
           >
-            GRE Learn
+            {brandTitle}
           </Link>
         </div>
         <div className="flex items-center gap-2">
           <ThemeQuickToggle />
-          <Link
-            href="/audio"
-            className="hidden rounded-full bg-[var(--accent)] px-4 py-2 font-[family-name:var(--font-ui)] text-sm font-medium text-[var(--on-accent)] sm:inline-flex"
-          >
-            Start review
-          </Link>
+          {!pathChrome && !pianoChrome ? (
+            <Link
+              href="/audio"
+              className="hidden rounded-full bg-[var(--accent)] px-4 py-2 font-[family-name:var(--font-ui)] text-sm font-medium text-[var(--on-accent)] sm:inline-flex"
+            >
+              Start review
+            </Link>
+          ) : null}
         </div>
       </div>
       <nav
@@ -50,7 +81,12 @@ export function AppNav() {
           const active =
             link.href === "/"
               ? pathname === "/"
-              : pathname.startsWith(link.href);
+              : link.href === "/path"
+                ? pathname.startsWith("/path") ||
+                  pathname.startsWith("/grammar") ||
+                  pathname.startsWith("/sentence") ||
+                  pathname.startsWith("/speaking")
+                : pathname.startsWith(link.href);
           return (
             <Link
               key={link.href}

@@ -28,7 +28,7 @@ export default async function HomePage() {
         <ManualAddForm />
       </section>
 
-      <div className="flex flex-col gap-3 sm:flex-row">
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
         <Link
           href="/audio"
           className="inline-flex min-h-12 items-center justify-center rounded-xl bg-[var(--accent)] px-5 font-[family-name:var(--font-ui)] text-sm font-semibold text-[var(--on-accent)]"
@@ -40,6 +40,18 @@ export default async function HomePage() {
           className="inline-flex min-h-12 items-center justify-center rounded-xl border border-[var(--line)] bg-[var(--surface)] px-5 font-[family-name:var(--font-ui)] text-sm font-medium text-[var(--ink)]"
         >
           Browse library
+        </Link>
+        <Link
+          href="/path"
+          className="font-[family-name:var(--font-ui)] text-sm text-[var(--ink-muted)] underline-offset-4 hover:text-[var(--ink)] hover:underline"
+        >
+          English Path
+        </Link>
+        <Link
+          href="/piano"
+          className="font-[family-name:var(--font-ui)] text-sm text-[var(--ink-muted)] underline-offset-4 hover:text-[var(--ink)] hover:underline"
+        >
+          Piano
         </Link>
       </div>
 

@@ -20,11 +20,20 @@ const envSchema = z.object({
   NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: z.string().optional(),
   NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: z.string().optional(),
   NEXT_PUBLIC_FIREBASE_APP_ID: z.string().optional(),
+  NEXT_PUBLIC_FIREBASE_VAPID_KEY: z.string().optional(),
+  CRON_SECRET: z.string().optional(),
+  /** Shared secret for Settings enable / token register / test send (not cron). */
+  NOTIFICATIONS_PAIRING_SECRET: z.string().optional(),
 });
 
 export type AppEnv = z.infer<typeof envSchema>;
 
 let cached: AppEnv | null = null;
+
+/** Test-only: clear cached env so process.env changes take effect. */
+export function resetEnvCacheForTests() {
+  cached = null;
+}
 
 export function getEnv(): AppEnv {
   if (cached) return cached;
@@ -76,6 +85,17 @@ export function getProviderStatus() {
       env.FIREBASE_ADMIN_PROJECT_ID &&
         env.FIREBASE_ADMIN_CLIENT_EMAIL &&
         env.FIREBASE_ADMIN_PRIVATE_KEY,
+    ),
+    fcmClientConfigured: Boolean(
+      env.NEXT_PUBLIC_FIREBASE_API_KEY &&
+        env.NEXT_PUBLIC_FIREBASE_PROJECT_ID &&
+        env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID &&
+        env.NEXT_PUBLIC_FIREBASE_APP_ID &&
+        env.NEXT_PUBLIC_FIREBASE_VAPID_KEY,
+    ),
+    cronConfigured: Boolean(env.CRON_SECRET),
+    notificationsAuthConfigured: Boolean(
+      env.NOTIFICATIONS_PAIRING_SECRET?.trim() || env.CRON_SECRET?.trim(),
     ),
   };
 }

@@ -1,4 +1,5 @@
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
+import { DigestSettingsCard } from "@/features/notifications/components/DigestSettingsCard";
 import { getProviderStatus } from "@/lib/env";
 
 export const dynamic = "force-dynamic";
@@ -13,13 +14,16 @@ export default function SettingsPage() {
           Settings
         </h1>
         <p className="mt-1 text-[var(--ink-muted)]">
-          Provider status and playback defaults. API keys are never shown here.
+          Provider status, install help, and Today’s English digests. API keys are
+          never shown here.
         </p>
       </div>
 
       <section className="rounded-2xl border border-[var(--line)] bg-[var(--surface-muted)] p-5">
         <ThemeToggle />
       </section>
+
+      <DigestSettingsCard />
 
       <section className="space-y-3 rounded-2xl border border-[var(--line)] bg-[var(--surface-muted)] p-5 font-[family-name:var(--font-ui)] text-sm">
         <h2 className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ink-muted)]">

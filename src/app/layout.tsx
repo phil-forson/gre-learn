@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { DM_Sans, Fraunces, Source_Serif_4 } from "next/font/google";
 import { AppNav } from "@/components/navigation/AppNav";
+import { ServiceWorkerRegister } from "@/components/pwa/ServiceWorkerRegister";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import "./globals.css";
 
@@ -23,6 +24,22 @@ export const metadata: Metadata = {
   title: "GRE Learn — Personal Vocabulary Podcast",
   description:
     "Turn GRE words you encounter into a personal vocabulary podcast with roots, mnemonics, and continuous audio review.",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    title: "GRE Learn",
+    statusBarStyle: "default",
+  },
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "32x32" },
+      { url: "/favicon-16.png", sizes: "16x16", type: "image/png" },
+      { url: "/favicon-32.png", sizes: "32x32", type: "image/png" },
+      { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180" }],
+  },
 };
 
 export const viewport: Viewport = {
@@ -47,6 +64,7 @@ export default function RootLayout({
         className={`${display.variable} ${body.variable} ${ui.variable} antialiased bg-grain`}
       >
         <ThemeProvider>
+          <ServiceWorkerRegister />
           <div className="mx-auto min-h-dvh w-full max-w-3xl px-4 pb-28 pt-4 sm:px-6">
             <AppNav />
             <main>{children}</main>

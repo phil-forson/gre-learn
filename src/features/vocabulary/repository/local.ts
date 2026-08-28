@@ -1,6 +1,29 @@
 import { promises as fs } from "fs";
 import path from "path";
 import type {
+  GrammarAudioLesson,
+  GrammarProgress,
+} from "@/features/grammar/types";
+import type {
+  SentenceAudioLesson,
+  SentenceProgress,
+} from "@/features/sentence/types";
+import type {
+  SpeakingAudioLesson,
+  SpeakingProgress,
+} from "@/features/speaking/types";
+import type {
+  NotificationPreferences,
+  PushDeviceToken,
+} from "@/features/notifications/types";
+import type {
+  PianoProfile,
+  PianoSkillProgress,
+  PracticeSession,
+  YoutubeNote,
+} from "@/features/piano/types";
+import type { LearningProfile } from "@/features/path/types";
+import type {
   AudioLesson,
   ReviewEvent,
   VocabularyEntry,
@@ -21,6 +44,19 @@ type StoreShape = {
   reviewEvents: ReviewEvent[];
   audioLessons: AudioLesson[];
   wordGroups: WordGroup[];
+  learningProfiles: LearningProfile[];
+  grammarProgress: GrammarProgress[];
+  grammarAudioLessons: GrammarAudioLesson[];
+  sentenceProgress: SentenceProgress[];
+  sentenceAudioLessons: SentenceAudioLesson[];
+  speakingProgress: SpeakingProgress[];
+  speakingAudioLessons: SpeakingAudioLesson[];
+  notificationPreferences: NotificationPreferences[];
+  pushDeviceTokens: PushDeviceToken[];
+  pianoProfiles: PianoProfile[];
+  pianoSessions: PracticeSession[];
+  pianoSkillProgress: PianoSkillProgress[];
+  youtubeNotes: YoutubeNote[];
 };
 
 export type LocalVocabularyRepositoryOptions = {
@@ -38,10 +74,44 @@ const emptyStore = (): StoreShape => ({
   reviewEvents: [],
   audioLessons: [],
   wordGroups: [],
+  learningProfiles: [],
+  grammarProgress: [],
+  grammarAudioLessons: [],
+  sentenceProgress: [],
+  sentenceAudioLessons: [],
+  speakingProgress: [],
+  speakingAudioLessons: [],
+  notificationPreferences: [],
+  pushDeviceTokens: [],
+  pianoProfiles: [],
+  pianoSessions: [],
+  pianoSkillProgress: [],
+  youtubeNotes: [],
 });
 
 function normalizeEntry(raw: VocabularyEntry): VocabularyEntry {
   return { ...raw, groupId: raw.groupId ?? null };
+}
+
+function normalizeGrammarProgress(raw: GrammarProgress): GrammarProgress {
+  return {
+    ...raw,
+    knowledgeTestPassed: raw.knowledgeTestPassed ?? false,
+  };
+}
+
+function normalizeSentenceProgress(raw: SentenceProgress): SentenceProgress {
+  return {
+    ...raw,
+    knowledgeTestPassed: raw.knowledgeTestPassed ?? false,
+  };
+}
+
+function normalizeSpeakingProgress(raw: SpeakingProgress): SpeakingProgress {
+  return {
+    ...raw,
+    knowledgeTestPassed: raw.knowledgeTestPassed ?? false,
+  };
 }
 
 function sleep(ms: number): Promise<void> {
@@ -76,6 +146,51 @@ function parseStore(raw: string): StoreShape {
     audioLessons: record.audioLessons as AudioLesson[],
     wordGroups: Array.isArray(record.wordGroups)
       ? (record.wordGroups as WordGroup[])
+      : [],
+    learningProfiles: Array.isArray(record.learningProfiles)
+      ? (record.learningProfiles as LearningProfile[])
+      : [],
+    grammarProgress: Array.isArray(record.grammarProgress)
+      ? (record.grammarProgress as GrammarProgress[]).map(
+          normalizeGrammarProgress,
+        )
+      : [],
+    grammarAudioLessons: Array.isArray(record.grammarAudioLessons)
+      ? (record.grammarAudioLessons as GrammarAudioLesson[])
+      : [],
+    sentenceProgress: Array.isArray(record.sentenceProgress)
+      ? (record.sentenceProgress as SentenceProgress[]).map(
+          normalizeSentenceProgress,
+        )
+      : [],
+    sentenceAudioLessons: Array.isArray(record.sentenceAudioLessons)
+      ? (record.sentenceAudioLessons as SentenceAudioLesson[])
+      : [],
+    speakingProgress: Array.isArray(record.speakingProgress)
+      ? (record.speakingProgress as SpeakingProgress[]).map(
+          normalizeSpeakingProgress,
+        )
+      : [],
+    speakingAudioLessons: Array.isArray(record.speakingAudioLessons)
+      ? (record.speakingAudioLessons as SpeakingAudioLesson[])
+      : [],
+    notificationPreferences: Array.isArray(record.notificationPreferences)
+      ? (record.notificationPreferences as NotificationPreferences[])
+      : [],
+    pushDeviceTokens: Array.isArray(record.pushDeviceTokens)
+      ? (record.pushDeviceTokens as PushDeviceToken[])
+      : [],
+    pianoProfiles: Array.isArray(record.pianoProfiles)
+      ? (record.pianoProfiles as PianoProfile[])
+      : [],
+    pianoSessions: Array.isArray(record.pianoSessions)
+      ? (record.pianoSessions as PracticeSession[])
+      : [],
+    pianoSkillProgress: Array.isArray(record.pianoSkillProgress)
+      ? (record.pianoSkillProgress as PianoSkillProgress[])
+      : [],
+    youtubeNotes: Array.isArray(record.youtubeNotes)
+      ? (record.youtubeNotes as YoutubeNote[])
       : [],
   };
 }
@@ -507,6 +622,471 @@ export class LocalVocabularyRepository implements VocabularyRepository {
         dateUpdated: new Date().toISOString(),
       };
       return store.vocabulary[index];
+    });
+  }
+
+  async getLearningProfile(userId: string): Promise<LearningProfile | null> {
+    const store = await this.readStore();
+    return (
+      store.learningProfiles.find((p) => p.userId === userId) ?? null
+    );
+  }
+
+  async upsertLearningProfile(
+    profile: LearningProfile,
+  ): Promise<LearningProfile> {
+    return this.mutateStore((store) => {
+      const index = store.learningProfiles.findIndex(
+        (p) => p.userId === profile.userId,
+      );
+      if (index >= 0) {
+        // Preserve identity: never overwrite another user's row via id clash
+        store.learningProfiles[index] = {
+          ...profile,
+          id: store.learningProfiles[index].id,
+          userId: store.learningProfiles[index].userId,
+        };
+        return store.learningProfiles[index];
+      }
+      store.learningProfiles.push(profile);
+      return profile;
+    });
+  }
+
+  async getGrammarProgress(
+    userId: string,
+    unitId: string,
+  ): Promise<GrammarProgress | null> {
+    const store = await this.readStore();
+    return (
+      store.grammarProgress.find(
+        (p) => p.userId === userId && p.unitId === unitId,
+      ) ?? null
+    );
+  }
+
+  async listGrammarProgress(userId: string): Promise<GrammarProgress[]> {
+    const store = await this.readStore();
+    return store.grammarProgress.filter((p) => p.userId === userId);
+  }
+
+  async upsertGrammarProgress(
+    progress: GrammarProgress,
+  ): Promise<GrammarProgress> {
+    return this.mutateStore((store) => {
+      const index = store.grammarProgress.findIndex(
+        (p) => p.userId === progress.userId && p.unitId === progress.unitId,
+      );
+      if (index >= 0) {
+        store.grammarProgress[index] = {
+          ...progress,
+          id: store.grammarProgress[index].id,
+          userId: store.grammarProgress[index].userId,
+          unitId: store.grammarProgress[index].unitId,
+        };
+        return store.grammarProgress[index];
+      }
+      store.grammarProgress.push(progress);
+      return progress;
+    });
+  }
+
+  async getGrammarAudioLesson(
+    userId: string,
+    grammarUnitId: string,
+    contentHash: string,
+  ): Promise<GrammarAudioLesson | null> {
+    const store = await this.readStore();
+    return (
+      store.grammarAudioLessons.find(
+        (l) =>
+          l.userId === userId &&
+          l.grammarUnitId === grammarUnitId &&
+          l.contentHash === contentHash &&
+          l.status !== "stale",
+      ) ?? null
+    );
+  }
+
+  async saveGrammarAudioLesson(
+    lesson: GrammarAudioLesson,
+  ): Promise<GrammarAudioLesson> {
+    return this.mutateStore((store) => {
+      const index = store.grammarAudioLessons.findIndex(
+        (l) => l.id === lesson.id && l.userId === lesson.userId,
+      );
+      if (index >= 0) {
+        store.grammarAudioLessons[index] = {
+          ...lesson,
+          userId: store.grammarAudioLessons[index].userId,
+        };
+        return store.grammarAudioLessons[index];
+      }
+      store.grammarAudioLessons.push(lesson);
+      return lesson;
+    });
+  }
+
+  async getSentenceProgress(
+    userId: string,
+    unitId: string,
+  ): Promise<SentenceProgress | null> {
+    const store = await this.readStore();
+    return (
+      store.sentenceProgress.find(
+        (p) => p.userId === userId && p.unitId === unitId,
+      ) ?? null
+    );
+  }
+
+  async listSentenceProgress(userId: string): Promise<SentenceProgress[]> {
+    const store = await this.readStore();
+    return store.sentenceProgress.filter((p) => p.userId === userId);
+  }
+
+  async upsertSentenceProgress(
+    progress: SentenceProgress,
+  ): Promise<SentenceProgress> {
+    return this.mutateStore((store) => {
+      const index = store.sentenceProgress.findIndex(
+        (p) => p.userId === progress.userId && p.unitId === progress.unitId,
+      );
+      if (index >= 0) {
+        store.sentenceProgress[index] = {
+          ...progress,
+          id: store.sentenceProgress[index].id,
+          userId: store.sentenceProgress[index].userId,
+          unitId: store.sentenceProgress[index].unitId,
+        };
+        return store.sentenceProgress[index];
+      }
+      store.sentenceProgress.push(progress);
+      return progress;
+    });
+  }
+
+  async getSentenceAudioLesson(
+    userId: string,
+    sentenceUnitId: string,
+    contentHash: string,
+  ): Promise<SentenceAudioLesson | null> {
+    const store = await this.readStore();
+    return (
+      store.sentenceAudioLessons.find(
+        (l) =>
+          l.userId === userId &&
+          l.sentenceUnitId === sentenceUnitId &&
+          l.contentHash === contentHash &&
+          l.status !== "stale",
+      ) ?? null
+    );
+  }
+
+  async saveSentenceAudioLesson(
+    lesson: SentenceAudioLesson,
+  ): Promise<SentenceAudioLesson> {
+    return this.mutateStore((store) => {
+      const index = store.sentenceAudioLessons.findIndex(
+        (l) => l.id === lesson.id && l.userId === lesson.userId,
+      );
+      if (index >= 0) {
+        store.sentenceAudioLessons[index] = {
+          ...lesson,
+          userId: store.sentenceAudioLessons[index].userId,
+        };
+        return store.sentenceAudioLessons[index];
+      }
+      store.sentenceAudioLessons.push(lesson);
+      return lesson;
+    });
+  }
+
+  async getSpeakingProgress(
+    userId: string,
+    unitId: string,
+  ): Promise<SpeakingProgress | null> {
+    const store = await this.readStore();
+    return (
+      store.speakingProgress.find(
+        (p) => p.userId === userId && p.unitId === unitId,
+      ) ?? null
+    );
+  }
+
+  async listSpeakingProgress(userId: string): Promise<SpeakingProgress[]> {
+    const store = await this.readStore();
+    return store.speakingProgress.filter((p) => p.userId === userId);
+  }
+
+  async upsertSpeakingProgress(
+    progress: SpeakingProgress,
+  ): Promise<SpeakingProgress> {
+    return this.mutateStore((store) => {
+      const index = store.speakingProgress.findIndex(
+        (p) => p.userId === progress.userId && p.unitId === progress.unitId,
+      );
+      if (index >= 0) {
+        store.speakingProgress[index] = {
+          ...progress,
+          id: store.speakingProgress[index].id,
+          userId: store.speakingProgress[index].userId,
+          unitId: store.speakingProgress[index].unitId,
+        };
+        return store.speakingProgress[index];
+      }
+      store.speakingProgress.push(progress);
+      return progress;
+    });
+  }
+
+  async getSpeakingAudioLesson(
+    userId: string,
+    speakingUnitId: string,
+    contentHash: string,
+  ): Promise<SpeakingAudioLesson | null> {
+    const store = await this.readStore();
+    return (
+      store.speakingAudioLessons.find(
+        (l) =>
+          l.userId === userId &&
+          l.speakingUnitId === speakingUnitId &&
+          l.contentHash === contentHash &&
+          l.status !== "stale",
+      ) ?? null
+    );
+  }
+
+  async saveSpeakingAudioLesson(
+    lesson: SpeakingAudioLesson,
+  ): Promise<SpeakingAudioLesson> {
+    return this.mutateStore((store) => {
+      const index = store.speakingAudioLessons.findIndex(
+        (l) => l.id === lesson.id && l.userId === lesson.userId,
+      );
+      if (index >= 0) {
+        store.speakingAudioLessons[index] = {
+          ...lesson,
+          userId: store.speakingAudioLessons[index].userId,
+        };
+        return store.speakingAudioLessons[index];
+      }
+      store.speakingAudioLessons.push(lesson);
+      return lesson;
+    });
+  }
+
+  async getNotificationPreferences(
+    userId: string,
+  ): Promise<NotificationPreferences | null> {
+    const store = await this.readStore();
+    return (
+      store.notificationPreferences.find((p) => p.userId === userId) ?? null
+    );
+  }
+
+  async listNotificationPreferences(): Promise<NotificationPreferences[]> {
+    const store = await this.readStore();
+    return [...store.notificationPreferences];
+  }
+
+  async upsertNotificationPreferences(
+    prefs: NotificationPreferences,
+  ): Promise<NotificationPreferences> {
+    return this.mutateStore((store) => {
+      const index = store.notificationPreferences.findIndex(
+        (p) => p.userId === prefs.userId,
+      );
+      if (index >= 0) {
+        store.notificationPreferences[index] = {
+          ...prefs,
+          id: store.notificationPreferences[index].id,
+          userId: store.notificationPreferences[index].userId,
+        };
+        return store.notificationPreferences[index];
+      }
+      store.notificationPreferences.push(prefs);
+      return prefs;
+    });
+  }
+
+  async listPushDeviceTokens(userId: string): Promise<PushDeviceToken[]> {
+    const store = await this.readStore();
+    return store.pushDeviceTokens.filter((t) => t.userId === userId);
+  }
+
+  async upsertPushDeviceToken(
+    token: PushDeviceToken,
+  ): Promise<PushDeviceToken> {
+    const MAX_TOKENS_PER_USER = 3;
+    return this.mutateStore((store) => {
+      const byToken = store.pushDeviceTokens.findIndex(
+        (t) => t.token === token.token,
+      );
+      if (byToken >= 0) {
+        store.pushDeviceTokens[byToken] = {
+          ...token,
+          id: store.pushDeviceTokens[byToken].id,
+          userId: token.userId,
+          dateCreated: store.pushDeviceTokens[byToken].dateCreated,
+        };
+        return store.pushDeviceTokens[byToken];
+      }
+      store.pushDeviceTokens.push(token);
+      const forUser = store.pushDeviceTokens
+        .filter((t) => t.userId === token.userId)
+        .sort((a, b) => a.dateCreated.localeCompare(b.dateCreated));
+      if (forUser.length > MAX_TOKENS_PER_USER) {
+        const drop = forUser.slice(0, forUser.length - MAX_TOKENS_PER_USER);
+        const dropIds = new Set(drop.map((t) => t.id));
+        store.pushDeviceTokens = store.pushDeviceTokens.filter(
+          (t) => !dropIds.has(t.id),
+        );
+      }
+      return token;
+    });
+  }
+
+  async deletePushDeviceToken(userId: string, token: string): Promise<void> {
+    await this.mutateStore((store) => {
+      store.pushDeviceTokens = store.pushDeviceTokens.filter(
+        (t) => !(t.userId === userId && t.token === token),
+      );
+      return undefined;
+    });
+  }
+
+  async deleteAllPushDeviceTokens(userId: string): Promise<void> {
+    await this.mutateStore((store) => {
+      store.pushDeviceTokens = store.pushDeviceTokens.filter(
+        (t) => t.userId !== userId,
+      );
+      return undefined;
+    });
+  }
+
+  async getPianoProfile(userId: string): Promise<PianoProfile | null> {
+    const store = await this.readStore();
+    return store.pianoProfiles.find((p) => p.userId === userId) ?? null;
+  }
+
+  async upsertPianoProfile(profile: PianoProfile): Promise<PianoProfile> {
+    return this.mutateStore((store) => {
+      const index = store.pianoProfiles.findIndex(
+        (p) => p.userId === profile.userId,
+      );
+      if (index >= 0) {
+        store.pianoProfiles[index] = {
+          ...profile,
+          id: store.pianoProfiles[index].id,
+          userId: store.pianoProfiles[index].userId,
+        };
+        return store.pianoProfiles[index];
+      }
+      store.pianoProfiles.push(profile);
+      return profile;
+    });
+  }
+
+  async listPianoSessions(userId: string): Promise<PracticeSession[]> {
+    const store = await this.readStore();
+    return store.pianoSessions.filter((s) => s.userId === userId);
+  }
+
+  async getPianoSessionByDay(
+    userId: string,
+    localDay: string,
+  ): Promise<PracticeSession | null> {
+    const store = await this.readStore();
+    return (
+      store.pianoSessions.find(
+        (s) => s.userId === userId && s.localDay === localDay,
+      ) ?? null
+    );
+  }
+
+  async upsertPianoSession(
+    session: PracticeSession,
+  ): Promise<PracticeSession> {
+    return this.mutateStore((store) => {
+      const index = store.pianoSessions.findIndex(
+        (s) =>
+          s.userId === session.userId && s.localDay === session.localDay,
+      );
+      if (index >= 0) {
+        store.pianoSessions[index] = {
+          ...session,
+          id: store.pianoSessions[index].id,
+          userId: store.pianoSessions[index].userId,
+          localDay: store.pianoSessions[index].localDay,
+        };
+        return store.pianoSessions[index];
+      }
+      store.pianoSessions.push(session);
+      return session;
+    });
+  }
+
+  async listPianoSkillProgress(
+    userId: string,
+  ): Promise<PianoSkillProgress[]> {
+    const store = await this.readStore();
+    return store.pianoSkillProgress.filter((p) => p.userId === userId);
+  }
+
+  async upsertPianoSkillProgress(
+    progress: PianoSkillProgress,
+  ): Promise<PianoSkillProgress> {
+    return this.mutateStore((store) => {
+      const index = store.pianoSkillProgress.findIndex(
+        (p) =>
+          p.userId === progress.userId && p.skillId === progress.skillId,
+      );
+      if (index >= 0) {
+        store.pianoSkillProgress[index] = {
+          ...progress,
+          id: store.pianoSkillProgress[index].id,
+          userId: store.pianoSkillProgress[index].userId,
+          skillId: store.pianoSkillProgress[index].skillId,
+        };
+        return store.pianoSkillProgress[index];
+      }
+      store.pianoSkillProgress.push(progress);
+      return progress;
+    });
+  }
+
+  async listYoutubeNotes(userId: string): Promise<YoutubeNote[]> {
+    const store = await this.readStore();
+    return store.youtubeNotes.filter((n) => n.userId === userId);
+  }
+
+  async getYoutubeNote(
+    userId: string,
+    noteId: string,
+  ): Promise<YoutubeNote | null> {
+    const store = await this.readStore();
+    return (
+      store.youtubeNotes.find(
+        (n) => n.userId === userId && n.id === noteId,
+      ) ?? null
+    );
+  }
+
+  async upsertYoutubeNote(note: YoutubeNote): Promise<YoutubeNote> {
+    return this.mutateStore((store) => {
+      const index = store.youtubeNotes.findIndex(
+        (n) => n.id === note.id && n.userId === note.userId,
+      );
+      if (index >= 0) {
+        store.youtubeNotes[index] = {
+          ...note,
+          id: store.youtubeNotes[index].id,
+          userId: store.youtubeNotes[index].userId,
+        };
+        return store.youtubeNotes[index];
+      }
+      store.youtubeNotes.push(note);
+      return note;
     });
   }
 }
