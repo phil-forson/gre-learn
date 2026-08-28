@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState, useTransition } from "react";
 import { SpeakingAudioPlayer } from "@/features/speaking/components/SpeakingAudioPlayer";
 import { SpeakingCompletedBadge } from "@/features/speaking/components/SpeakingCompletedBadge";
+import { ExerciseAskAi } from "@/features/learning/components/ExerciseAskAi";
 import type {
   SpeakingProgress,
   PublicSpeakingUnit,
@@ -195,6 +196,8 @@ export default function SpeakingUnitPage() {
           Practice
         </h2>
         <p className="text-sm text-[var(--ink-muted)]">{unit.microTask.prompt}</p>
+
+        <ExerciseAskAi askUrl={`/api/speaking/units/${unit.id}/ask`} />
 
         <div className="space-y-6">
           {unit.microTask.items.map((item, itemIndex) => {

@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState, useTransition } from "react";
 import { SentenceAudioPlayer } from "@/features/sentence/components/SentenceAudioPlayer";
 import { SentenceCompletedBadge } from "@/features/sentence/components/SentenceCompletedBadge";
+import { ExerciseAskAi } from "@/features/learning/components/ExerciseAskAi";
 import type {
   SentenceProgress,
   PublicSentenceUnit,
@@ -195,6 +196,8 @@ export default function SentenceUnitPage() {
           Practice
         </h2>
         <p className="text-sm text-[var(--ink-muted)]">{unit.microTask.prompt}</p>
+
+        <ExerciseAskAi askUrl={`/api/sentence/units/${unit.id}/ask`} />
 
         <div className="space-y-6">
           {unit.microTask.items.map((item, itemIndex) => {

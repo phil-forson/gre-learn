@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { ScaleFingeringChart } from "@/features/piano/components/ScaleFingeringChart";
+import { ExerciseAskAi } from "@/features/learning/components/ExerciseAskAi";
 import type { BlockLessonDetail } from "@/features/piano/services/lesson-detail";
 
 type Block = {
@@ -274,6 +275,10 @@ export function TodayChecklist({
                 {block.detail.tip}
               </p>
             ) : null}
+            <ExerciseAskAi
+              askUrl={`/api/piano/skills/${block.skillId}/ask`}
+              body={{ localDay }}
+            />
           </div>
 
           <details className="mt-3 text-xs text-[var(--ink-muted)]">

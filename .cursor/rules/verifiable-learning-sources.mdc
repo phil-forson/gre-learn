@@ -59,3 +59,12 @@ Store sources in code as `LearningSource` (`src/lib/learning-source.ts`):
 ## When no public URL exists
 
 Stop and ask the user for an official PDF, book edition, or link — **do not guess**. Temporary user-supplied text (YouTube note) may be tagged `source: user` and is not agent authority.
+
+## Ask AI (exercise help)
+
+When adding AI explainers on exercises:
+
+- **Server builds the reference pack** from the current lesson + sources + glossary — never trust client-sent lesson text.
+- System prompt must forbid facts outside the pack (`grounded-ask-ai.ts`).
+- Temperature **0**; filter `citedSourceTitles` to the allowlist only.
+- Mock mode must still refuse to invent facts outside the pack.
