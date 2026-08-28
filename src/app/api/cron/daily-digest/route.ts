@@ -19,12 +19,27 @@ function assertCronAuthorized(request: Request) {
   }
 }
 
+async function handleCron(request: Request) {
+  assertCronAuthorized(request);
+  const url = new URL(request.url);
+  const ignoreSendHour = url.searchParams.get("ignoreSendHour") === "1";
+  return runDailyDigestCron(new Date(), { ignoreSendHour });
+}
+
+/** Vercel Cron invokes GET with Authorization: Bearer CRON_SECRET */
+export async function GET(request: Request) {
+  try {
+    const result = await handleCron(request);
+    return jsonOk({ ok: true, ...result });
+  } catch (error) {
+    return jsonError(error);
+  }
+}
+
+/** Manual dry-run: POST with the same Bearer secret */
 export async function POST(request: Request) {
   try {
-    assertCronAuthorized(request);
-    const url = new URL(request.url);
-    const ignoreSendHour = url.searchParams.get("ignoreSendHour") === "1";
-    const result = await runDailyDigestCron(new Date(), { ignoreSendHour });
+    const result = await handleCron(request);
     return jsonOk({ ok: true, ...result });
   } catch (error) {
     return jsonError(error);
