@@ -18,7 +18,10 @@ type FcmStatus = {
 type PrefsResponse = {
   preferences: NotificationPreferences;
   fcm: FcmStatus;
+  deviceTokenCount?: number;
 };
+
+const LOCAL_TOKEN_KEY = "gre-learn-fcm-token-preview";
 
 function pairingHeaders(pairing: string): HeadersInit {
   return {
@@ -33,7 +36,51 @@ export function DigestSettingsCard() {
   const [pairing, setPairing] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [deviceTokenCount, setDeviceTokenCount] = useState<number | null>(null);
+  const [localTokenPreview, setLocalTokenPreview] = useState<string | null>(
+    null,
+  );
   const [pending, startTransition] = useTransition();
+
+  async function refreshPrefs() {
+    const res = await fetch("/api/notifications/preferences");
+    const data = (await res.json()) as PrefsResponse & {
+      error?: { message: string };
+    };
+    if (!res.ok) {
+      throw new Error(data.error?.message ?? "Failed to load preferences");
+    }
+    setPrefs(data.preferences);
+    setFcm(data.fcm);
+    setDeviceTokenCount(data.deviceTokenCount ?? 0);
+  }
+
+  async function registerThisPhone(code: string) {
+    const fcmResult = await registerFcmToken();
+    if (!fcmResult.ok) {
+      throw new Error(fcmResult.reason);
+    }
+    const tokenRes = await fetch("/api/notifications/push-token", {
+      method: "POST",
+      headers: pairingHeaders(code),
+      body: JSON.stringify({
+        token: fcmResult.token,
+        userAgent: navigator.userAgent,
+      }),
+    });
+    const tokenData = await tokenRes.json();
+    if (!tokenRes.ok) {
+      throw new Error(tokenData.error?.message ?? "Could not save push token");
+    }
+    try {
+      sessionStorage.setItem(LOCAL_TOKEN_KEY, fcmResult.token);
+    } catch {
+      /* ignore */
+    }
+    setLocalTokenPreview(fcmResult.token);
+    await refreshPrefs();
+    return fcmResult.token;
+  }
 
   useEffect(() => {
     if (!prefs?.enabled) return;
@@ -46,6 +93,8 @@ export function DigestSettingsCard() {
     try {
       const saved = sessionStorage.getItem(PAIRING_STORAGE_KEY);
       if (saved) setPairing(saved);
+      const savedToken = sessionStorage.getItem(LOCAL_TOKEN_KEY);
+      if (savedToken) setLocalTokenPreview(savedToken);
     } catch {
       /* ignore */
     }
@@ -53,17 +102,7 @@ export function DigestSettingsCard() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/api/notifications/preferences");
-        const data = (await res.json()) as PrefsResponse & {
-          error?: { message: string };
-        };
-        if (!res.ok) {
-          throw new Error(data.error?.message ?? "Failed to load preferences");
-        }
-        if (!cancelled) {
-          setPrefs(data.preferences);
-          setFcm(data.fcm);
-        }
+        await refreshPrefs();
       } catch (err) {
         if (!cancelled) {
           setError(err instanceof Error ? err.message : "Failed to load");
@@ -166,20 +205,7 @@ export function DigestSettingsCard() {
           return;
         }
 
-        const tokenRes = await fetch("/api/notifications/push-token", {
-          method: "POST",
-          headers: pairingHeaders(code),
-          body: JSON.stringify({
-            token: fcmResult.token,
-            userAgent: navigator.userAgent,
-          }),
-        });
-        const tokenData = await tokenRes.json();
-        if (!tokenRes.ok) {
-          throw new Error(
-            tokenData.error?.message ?? "Could not save push token",
-          );
-        }
+        await registerThisPhone(code);
         setMessage(
           "Today’s English digests are on. This device can receive push.",
         );
@@ -194,6 +220,22 @@ export function DigestSettingsCard() {
     setMessage("Digests turned off. Device tokens cleared.");
   }
 
+  async function registerPhoneOnly() {
+    setError(null);
+    setMessage(null);
+    startTransition(async () => {
+      try {
+        const code = requirePairing();
+        await registerThisPhone(code);
+        setMessage(
+          "Phone registered for push. You can Send test or paste the token into Firebase Console.",
+        );
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Registration failed");
+      }
+    });
+  }
+
   async function sendTest() {
     setError(null);
     setMessage(null);
@@ -201,23 +243,7 @@ export function DigestSettingsCard() {
       try {
         const code = requirePairing();
 
-        const fcmResult = await registerFcmToken();
-        if (fcmResult.ok) {
-          const tokenRes = await fetch("/api/notifications/push-token", {
-            method: "POST",
-            headers: pairingHeaders(code),
-            body: JSON.stringify({
-              token: fcmResult.token,
-              userAgent: navigator.userAgent,
-            }),
-          });
-          if (!tokenRes.ok) {
-            const tokenData = await tokenRes.json();
-            throw new Error(
-              tokenData.error?.message ?? "Could not refresh push token",
-            );
-          }
-        }
+        await registerThisPhone(code);
 
         const res = await fetch("/api/notifications/test", {
           method: "POST",
@@ -234,12 +260,6 @@ export function DigestSettingsCard() {
           data.result?.errors?.[0] && !data.ok
             ? ` (${data.result.errors[0]})`
             : "";
-        if (!fcmResult.ok) {
-          setMessage(
-            `${data.message ?? "Test complete."}${preview} Push token not refreshed: ${fcmResult.reason}`,
-          );
-          return;
-        }
         if (!data.ok) {
           setError(`${data.message ?? "Test send failed."}${preview}${err}`);
           return;
@@ -248,6 +268,13 @@ export function DigestSettingsCard() {
       } catch (err) {
         setError(err instanceof Error ? err.message : "Test send failed");
       }
+    });
+  }
+
+  function copyLocalToken() {
+    if (!localTokenPreview) return;
+    void navigator.clipboard.writeText(localTokenPreview).then(() => {
+      setMessage("FCM token copied — paste into Firebase “Test on device”.");
     });
   }
 
@@ -320,6 +347,16 @@ export function DigestSettingsCard() {
           <button
             type="button"
             disabled={pending}
+            onClick={registerPhoneOnly}
+            className="rounded-full border border-[var(--line)] px-4 py-2 font-[family-name:var(--font-ui)] text-sm text-[var(--ink-muted)] disabled:opacity-60"
+          >
+            Register this phone
+          </button>
+        ) : null}
+        {prefs.enabled ? (
+          <button
+            type="button"
+            disabled={pending}
             onClick={sendTest}
             className="rounded-full border border-[var(--line)] px-4 py-2 font-[family-name:var(--font-ui)] text-sm text-[var(--ink-muted)] disabled:opacity-60"
           >
@@ -327,6 +364,33 @@ export function DigestSettingsCard() {
           </button>
         ) : null}
       </div>
+
+      {prefs.enabled && deviceTokenCount !== null ? (
+        <p className="font-[family-name:var(--font-ui)] text-xs text-[var(--ink-muted)]">
+          Devices registered on server: {deviceTokenCount}.{" "}
+          {deviceTokenCount === 0
+            ? "Tap Register this phone first — Firebase Console “Test on device” will stay empty until the app saves a token."
+            : "Send test uses these tokens."}
+        </p>
+      ) : null}
+
+      {localTokenPreview ? (
+        <div className="rounded-xl border border-[var(--line)] bg-[var(--surface)] p-3 text-xs">
+          <p className="font-[family-name:var(--font-ui)] font-medium text-[var(--ink)]">
+            FCM token (for Firebase Console → Messaging → Test on device)
+          </p>
+          <p className="mt-1 break-all font-mono text-[var(--ink-muted)]">
+            {localTokenPreview.slice(0, 24)}…{localTokenPreview.slice(-12)}
+          </p>
+          <button
+            type="button"
+            onClick={copyLocalToken}
+            className="mt-2 rounded-full border border-[var(--line)] px-3 py-1 font-[family-name:var(--font-ui)] text-xs"
+          >
+            Copy full token
+          </button>
+        </div>
+      ) : null}
 
       {prefs.enabled ? (
         <div className="grid gap-3 font-[family-name:var(--font-ui)] text-sm sm:grid-cols-2">
@@ -451,6 +515,14 @@ export function DigestSettingsCard() {
             screen, then enable digests and allow notifications.
           </li>
         </ul>
+        <p className="mt-3 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.14em]">
+          Not the same as Firebase “Compose notification”
+        </p>
+        <p className="mt-1 text-xs">
+          Firebase Console → Messaging → Test on device needs an FCM token from
+          this app (Register this phone → Copy full token). Our Send test goes
+          through gre-learn directly — use that first.
+        </p>
         {fcm ? (
           <p className="mt-2 text-xs">
             Push client: {fcm.clientConfigured ? "configured" : "not configured"}

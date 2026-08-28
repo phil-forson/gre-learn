@@ -7,6 +7,8 @@ import {
   getNotificationPreferences,
   patchNotificationPreferences,
 } from "@/features/notifications/services/preferences-service";
+import { getNotificationRepository } from "@/features/notifications/repository";
+import { getEnv } from "@/lib/env";
 import {
   isFcmClientConfigured,
   isFcmSendConfigured,
@@ -23,9 +25,13 @@ function fcmStatus() {
 export async function GET() {
   try {
     const preferences = await getNotificationPreferences();
+    const tokens = await getNotificationRepository().listPushTokens(
+      getEnv().DEFAULT_USER_ID,
+    );
     return jsonOk({
       preferences,
       fcm: fcmStatus(),
+      deviceTokenCount: tokens.length,
     });
   } catch (error) {
     return jsonError(error);
