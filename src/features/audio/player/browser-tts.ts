@@ -100,11 +100,12 @@ export function speakBrowser(
   };
   utter.onerror = (event) => {
     // Advancing/pausing cancels the current utterance — not a real failure.
+    const code = event.error as string;
     if (
       cancelled ||
-      event.error === "interrupted" ||
-      event.error === "canceled" ||
-      event.error === "cancelled"
+      code === "interrupted" ||
+      code === "canceled" ||
+      code === "cancelled"
     ) {
       return;
     }
