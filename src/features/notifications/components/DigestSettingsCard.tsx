@@ -1,10 +1,14 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   listenForForegroundMessages,
   registerFcmToken,
 } from "@/features/notifications/client/fcm";
+import {
+  readPushEnvironment,
+  type PushEnvironment,
+} from "@/features/notifications/client/push-diagnostics";
 import type { NotificationPreferences } from "@/features/notifications/types";
 
 const PAIRING_STORAGE_KEY = "gre-learn-notifications-pairing";
@@ -21,7 +25,12 @@ type PrefsResponse = {
   deviceTokenCount?: number;
 };
 
+type BusyAction = "enable" | "disable" | "register" | "test" | null;
+
 const LOCAL_TOKEN_KEY = "gre-learn-fcm-token-preview";
+
+const actionButtonClass =
+  "inline-flex min-h-11 touch-manipulation select-none items-center justify-center rounded-full border border-[var(--line)] px-4 py-2 font-[family-name:var(--font-ui)] text-sm disabled:pointer-events-none disabled:opacity-50";
 
 function pairingHeaders(pairing: string): HeadersInit {
   return {
@@ -40,7 +49,12 @@ export function DigestSettingsCard() {
   const [localTokenPreview, setLocalTokenPreview] = useState<string | null>(
     null,
   );
-  const [pending, startTransition] = useTransition();
+  const [pushEnv, setPushEnv] = useState<PushEnvironment | null>(null);
+  const [busyLabel, setBusyLabel] = useState<string | null>(null);
+  const [busyAction, setBusyAction] = useState<BusyAction>(null);
+  const patchSeq = useRef(0);
+
+  const actionLocked = busyAction !== null;
 
   async function refreshPrefs() {
     const res = await fetch("/api/notifications/preferences");
@@ -81,6 +95,10 @@ export function DigestSettingsCard() {
     await refreshPrefs();
     return fcmResult.token;
   }
+
+  useEffect(() => {
+    setPushEnv(readPushEnvironment());
+  }, []);
 
   useEffect(() => {
     if (!prefs?.enabled) return;
@@ -127,6 +145,9 @@ export function DigestSettingsCard() {
   function applyResponse(data: PrefsResponse) {
     setPrefs(data.preferences);
     setFcm(data.fcm);
+    if (data.deviceTokenCount !== undefined) {
+      setDeviceTokenCount(data.deviceTokenCount);
+    }
   }
 
   function requirePairing(): string {
@@ -139,10 +160,10 @@ export function DigestSettingsCard() {
     return value;
   }
 
+  /** Background preference saves — never lock action buttons. */
   function patch(body: Record<string, unknown>) {
-    setError(null);
-    setMessage(null);
-    startTransition(async () => {
+    const seq = ++patchSeq.current;
+    void (async () => {
       try {
         const code = requirePairing();
         const res = await fetch("/api/notifications/preferences", {
@@ -156,119 +177,166 @@ export function DigestSettingsCard() {
         if (!res.ok) {
           throw new Error(data.error?.message ?? "Update failed");
         }
-        applyResponse(data);
+        if (seq === patchSeq.current) {
+          applyResponse(data);
+        }
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Update failed");
+        if (seq === patchSeq.current) {
+          setError(err instanceof Error ? err.message : "Update failed");
+        }
       }
-    });
+    })();
   }
 
   async function enableDigest() {
+    if (actionLocked) return;
     setError(null);
     setMessage(null);
-    startTransition(async () => {
-      try {
-        const code = requirePairing();
-        if (fcm && !fcm.authConfigured) {
-          throw new Error(
-            "Set NOTIFICATIONS_PAIRING_SECRET (or CRON_SECRET) in .env.local, then restart the server.",
-          );
-        }
-
-        const timezone =
-          Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
-        const res = await fetch("/api/notifications/preferences", {
-          method: "PATCH",
-          headers: pairingHeaders(code),
-          body: JSON.stringify({ enabled: true, timezone }),
-        });
-        const data = (await res.json()) as PrefsResponse & {
-          error?: { message: string };
-        };
-        if (!res.ok) {
-          throw new Error(data.error?.message ?? "Could not enable digests");
-        }
-        applyResponse(data);
-
-        if (!data.fcm.clientConfigured) {
-          setMessage(
-            "Digests enabled. Push delivery needs Firebase web config + NEXT_PUBLIC_FIREBASE_VAPID_KEY.",
-          );
-          return;
-        }
-
-        const fcmResult = await registerFcmToken();
-        if (!fcmResult.ok) {
-          setMessage(
-            `Digests enabled, but push setup paused: ${fcmResult.reason}`,
-          );
-          return;
-        }
-
-        await registerThisPhone(code);
-        setMessage(
-          "Today’s English digests are on. This device can receive push.",
+    setBusyAction("enable");
+    setBusyLabel("Enabling digests…");
+    try {
+      const code = requirePairing();
+      if (fcm && !fcm.authConfigured) {
+        throw new Error(
+          "Set NOTIFICATIONS_PAIRING_SECRET (or CRON_SECRET) in .env.local, then restart the server.",
         );
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Enable failed");
       }
-    });
+
+      const timezone =
+        Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+      const res = await fetch("/api/notifications/preferences", {
+        method: "PATCH",
+        headers: pairingHeaders(code),
+        body: JSON.stringify({ enabled: true, timezone }),
+      });
+      const data = (await res.json()) as PrefsResponse & {
+        error?: { message: string };
+      };
+      if (!res.ok) {
+        throw new Error(data.error?.message ?? "Could not enable digests");
+      }
+      applyResponse(data);
+
+      if (!data.fcm.clientConfigured) {
+        setMessage(
+          "Digests enabled. Push delivery needs Firebase web config + NEXT_PUBLIC_FIREBASE_VAPID_KEY.",
+        );
+        return;
+      }
+
+      setBusyLabel("Registering this phone…");
+      const fcmResult = await registerFcmToken();
+      if (!fcmResult.ok) {
+        setMessage(`Digests enabled, but push setup paused: ${fcmResult.reason}`);
+        setPushEnv(readPushEnvironment());
+        return;
+      }
+
+      await registerThisPhone(code);
+      setPushEnv(readPushEnvironment());
+      setMessage(
+        "Today’s English digests are on. This device can receive push.",
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Enable failed");
+    } finally {
+      setBusyAction(null);
+      setBusyLabel(null);
+    }
   }
 
-  function disableDigest() {
-    patch({ enabled: false });
-    setMessage("Digests turned off. Device tokens cleared.");
+  async function disableDigest() {
+    if (actionLocked) return;
+    setError(null);
+    setMessage(null);
+    setBusyAction("disable");
+    setBusyLabel("Turning off digests…");
+    try {
+      const code = requirePairing();
+      const res = await fetch("/api/notifications/preferences", {
+        method: "PATCH",
+        headers: pairingHeaders(code),
+        body: JSON.stringify({ enabled: false }),
+      });
+      const data = (await res.json()) as PrefsResponse & {
+        error?: { message: string };
+      };
+      if (!res.ok) {
+        throw new Error(data.error?.message ?? "Could not disable digests");
+      }
+      applyResponse(data);
+      await refreshPrefs();
+      setMessage("Digests turned off. Device tokens cleared.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Disable failed");
+    } finally {
+      setBusyAction(null);
+      setBusyLabel(null);
+    }
   }
 
   async function registerPhoneOnly() {
+    if (actionLocked) return;
     setError(null);
     setMessage(null);
-    startTransition(async () => {
-      try {
-        const code = requirePairing();
-        await registerThisPhone(code);
-        setMessage(
-          "Phone registered for push. You can Send test or paste the token into Firebase Console.",
-        );
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Registration failed");
-      }
-    });
+    setBusyAction("register");
+    setBusyLabel("Registering this phone…");
+    try {
+      const code = requirePairing();
+      await registerThisPhone(code);
+      setPushEnv(readPushEnvironment());
+      setMessage(
+        "Phone registered for push. You can Send test or paste the token into Firebase Console.",
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Registration failed");
+      setPushEnv(readPushEnvironment());
+    } finally {
+      setBusyAction(null);
+      setBusyLabel(null);
+    }
   }
 
   async function sendTest() {
+    if (actionLocked) return;
     setError(null);
     setMessage(null);
-    startTransition(async () => {
-      try {
-        const code = requirePairing();
+    setBusyAction("test");
+    setBusyLabel("Registering phone, then sending test…");
+    try {
+      const code = requirePairing();
 
-        await registerThisPhone(code);
+      await registerThisPhone(code);
+      setPushEnv(readPushEnvironment());
 
-        const res = await fetch("/api/notifications/test", {
-          method: "POST",
-          headers: pairingHeaders(code),
-        });
-        const data = await res.json();
-        if (!res.ok) {
-          throw new Error(data.error?.message ?? "Test send failed");
-        }
-        const preview = data.preview
-          ? ` “${data.preview.title}: ${data.preview.body}”`
-          : "";
-        const err =
-          data.result?.errors?.[0] && !data.ok
-            ? ` (${data.result.errors[0]})`
-            : "";
-        if (!data.ok) {
-          setError(`${data.message ?? "Test send failed."}${preview}${err}`);
-          return;
-        }
-        setMessage(`${data.message ?? "Test complete."}${preview}${err}`);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Test send failed");
+      setBusyLabel("Sending test notification…");
+      const res = await fetch("/api/notifications/test", {
+        method: "POST",
+        headers: pairingHeaders(code),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error?.message ?? "Test send failed");
       }
-    });
+      const preview = data.preview
+        ? ` “${data.preview.title}: ${data.preview.body}”`
+        : "";
+      const err =
+        data.result?.errors?.[0] && !data.ok
+          ? ` (${data.result.errors[0]})`
+          : "";
+      if (!data.ok) {
+        setError(`${data.message ?? "Test send failed."}${preview}${err}`);
+        return;
+      }
+      setMessage(`${data.message ?? "Test complete."}${preview}${err}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Test send failed");
+      setPushEnv(readPushEnvironment());
+    } finally {
+      setBusyAction(null);
+      setBusyLabel(null);
+    }
   }
 
   function copyLocalToken() {
@@ -312,7 +380,7 @@ export function DigestSettingsCard() {
         <input
           type="password"
           autoComplete="off"
-          className="rounded-xl border border-[var(--line)] bg-[var(--surface)] px-3 py-2"
+          className="min-h-11 rounded-xl border border-[var(--line)] bg-[var(--surface)] px-3 py-2 touch-manipulation"
           value={pairing}
           onChange={(e) => rememberPairing(e.target.value)}
           placeholder="NOTIFICATIONS_PAIRING_SECRET from .env.local"
@@ -327,18 +395,18 @@ export function DigestSettingsCard() {
         {prefs.enabled ? (
           <button
             type="button"
-            disabled={pending}
-            onClick={disableDigest}
-            className="rounded-full border border-[var(--line)] px-4 py-2 font-[family-name:var(--font-ui)] text-sm font-medium text-[var(--ink)] disabled:opacity-60"
+            disabled={actionLocked}
+            onClick={() => void disableDigest()}
+            className={`${actionButtonClass} font-medium text-[var(--ink)]`}
           >
             Turn off digests
           </button>
         ) : (
           <button
             type="button"
-            disabled={pending}
-            onClick={enableDigest}
-            className="rounded-full bg-[var(--accent)] px-4 py-2 font-[family-name:var(--font-ui)] text-sm font-medium text-[var(--on-accent)] disabled:opacity-60"
+            disabled={actionLocked}
+            onClick={() => void enableDigest()}
+            className="inline-flex min-h-11 touch-manipulation select-none items-center justify-center rounded-full bg-[var(--accent)] px-4 py-2 font-[family-name:var(--font-ui)] text-sm font-medium text-[var(--on-accent)] disabled:pointer-events-none disabled:opacity-50"
           >
             Enable digests
           </button>
@@ -346,9 +414,9 @@ export function DigestSettingsCard() {
         {prefs.enabled ? (
           <button
             type="button"
-            disabled={pending}
-            onClick={registerPhoneOnly}
-            className="rounded-full border border-[var(--line)] px-4 py-2 font-[family-name:var(--font-ui)] text-sm text-[var(--ink-muted)] disabled:opacity-60"
+            disabled={actionLocked}
+            onClick={() => void registerPhoneOnly()}
+            className={`${actionButtonClass} text-[var(--ink-muted)]`}
           >
             Register this phone
           </button>
@@ -356,14 +424,63 @@ export function DigestSettingsCard() {
         {prefs.enabled ? (
           <button
             type="button"
-            disabled={pending}
-            onClick={sendTest}
-            className="rounded-full border border-[var(--line)] px-4 py-2 font-[family-name:var(--font-ui)] text-sm text-[var(--ink-muted)] disabled:opacity-60"
+            disabled={actionLocked}
+            onClick={() => void sendTest()}
+            className={`${actionButtonClass} text-[var(--ink-muted)]`}
           >
             Send test
           </button>
         ) : null}
       </div>
+
+      {busyLabel ? (
+        <p className="rounded-xl border border-[var(--line)] bg-[var(--surface)] px-3 py-2 font-[family-name:var(--font-ui)] text-sm text-[var(--ink)]">
+          {busyLabel}
+        </p>
+      ) : null}
+
+      {error ? (
+        <p className="rounded-xl border border-[var(--danger)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--danger)]">
+          {error}
+        </p>
+      ) : null}
+
+      {message ? (
+        <p className="rounded-xl border border-[var(--accent)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--accent)]">
+          {message}
+        </p>
+      ) : null}
+
+      {pushEnv && prefs.enabled ? (
+        <div className="rounded-xl border border-[var(--line)] bg-[var(--surface)] p-3 text-xs text-[var(--ink-muted)]">
+          <p className="font-[family-name:var(--font-ui)] font-medium text-[var(--ink)]">
+            This device
+          </p>
+          <ul className="mt-1 list-disc space-y-0.5 pl-4">
+            <li>
+              Home Screen app:{" "}
+              {pushEnv.standalone ? "yes ✓" : "no — add to Home Screen first"}
+            </li>
+            <li>
+              Notification permission:{" "}
+              {pushEnv.permission === "unsupported"
+                ? "not supported"
+                : pushEnv.permission}
+            </li>
+            <li>
+              Can register for push:{" "}
+              {pushEnv.readyForRegister ? "yes ✓" : "not yet"}
+            </li>
+          </ul>
+          {pushEnv.hints.length > 0 ? (
+            <ul className="mt-2 list-disc space-y-1 pl-4 text-[var(--ink)]">
+              {pushEnv.hints.map((hint) => (
+                <li key={hint}>{hint}</li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
+      ) : null}
 
       {prefs.enabled && deviceTokenCount !== null ? (
         <p className="font-[family-name:var(--font-ui)] text-xs text-[var(--ink-muted)]">
@@ -385,7 +502,7 @@ export function DigestSettingsCard() {
           <button
             type="button"
             onClick={copyLocalToken}
-            className="mt-2 rounded-full border border-[var(--line)] px-3 py-1 font-[family-name:var(--font-ui)] text-xs"
+            className="mt-2 inline-flex min-h-9 touch-manipulation select-none items-center rounded-full border border-[var(--line)] px-3 py-1 font-[family-name:var(--font-ui)] text-xs"
           >
             Copy full token
           </button>
@@ -397,7 +514,7 @@ export function DigestSettingsCard() {
           <label className="flex flex-col gap-1">
             <span className="text-[var(--ink-muted)]">Timezone</span>
             <input
-              className="rounded-xl border border-[var(--line)] bg-[var(--surface)] px-3 py-2"
+              className="min-h-11 rounded-xl border border-[var(--line)] bg-[var(--surface)] px-3 py-2 touch-manipulation"
               value={prefs.timezone}
               onChange={(e) => setPrefs({ ...prefs, timezone: e.target.value })}
               onBlur={(e) => patch({ timezone: e.target.value })}
@@ -406,7 +523,7 @@ export function DigestSettingsCard() {
           <label className="flex flex-col gap-1">
             <span className="text-[var(--ink-muted)]">Send hour (local)</span>
             <select
-              className="rounded-xl border border-[var(--line)] bg-[var(--surface)] px-3 py-2"
+              className="min-h-11 rounded-xl border border-[var(--line)] bg-[var(--surface)] px-3 py-2 touch-manipulation"
               value={prefs.sendHourLocal}
               onChange={(e) => {
                 const sendHourLocal = Number(e.target.value);
@@ -424,7 +541,7 @@ export function DigestSettingsCard() {
           <label className="flex flex-col gap-1">
             <span className="text-[var(--ink-muted)]">Quiet hours start</span>
             <select
-              className="rounded-xl border border-[var(--line)] bg-[var(--surface)] px-3 py-2"
+              className="min-h-11 rounded-xl border border-[var(--line)] bg-[var(--surface)] px-3 py-2 touch-manipulation"
               value={prefs.quietHoursStart ?? ""}
               onChange={(e) => {
                 const quietHoursStart =
@@ -444,7 +561,7 @@ export function DigestSettingsCard() {
           <label className="flex flex-col gap-1">
             <span className="text-[var(--ink-muted)]">Quiet hours end</span>
             <select
-              className="rounded-xl border border-[var(--line)] bg-[var(--surface)] px-3 py-2"
+              className="min-h-11 rounded-xl border border-[var(--line)] bg-[var(--surface)] px-3 py-2 touch-manipulation"
               value={prefs.quietHoursEnd ?? ""}
               onChange={(e) => {
                 const quietHoursEnd =
@@ -461,41 +578,50 @@ export function DigestSettingsCard() {
               ))}
             </select>
           </label>
-          <label className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={prefs.includeGrammar}
-              onChange={(e) => {
-                const includeGrammar = e.target.checked;
-                setPrefs({ ...prefs, includeGrammar });
-                patch({ includeGrammar });
-              }}
-            />
-            Include grammar
+          <label className="flex flex-col gap-2 touch-manipulation">
+            <span className="flex min-h-11 items-center gap-2">
+              <input
+                type="checkbox"
+                className="h-4 w-4"
+                checked={prefs.includeGrammar}
+                onChange={(e) => {
+                  const includeGrammar = e.target.checked;
+                  setPrefs({ ...prefs, includeGrammar });
+                  patch({ includeGrammar });
+                }}
+              />
+              Include grammar
+            </span>
           </label>
-          <label className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={prefs.includeVocab}
-              onChange={(e) => {
-                const includeVocab = e.target.checked;
-                setPrefs({ ...prefs, includeVocab });
-                patch({ includeVocab });
-              }}
-            />
-            Include vocabulary
+          <label className="flex flex-col gap-2 touch-manipulation">
+            <span className="flex min-h-11 items-center gap-2">
+              <input
+                type="checkbox"
+                className="h-4 w-4"
+                checked={prefs.includeVocab}
+                onChange={(e) => {
+                  const includeVocab = e.target.checked;
+                  setPrefs({ ...prefs, includeVocab });
+                  patch({ includeVocab });
+                }}
+              />
+              Include vocabulary
+            </span>
           </label>
-          <label className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={prefs.includePiano !== false}
-              onChange={(e) => {
-                const includePiano = e.target.checked;
-                setPrefs({ ...prefs, includePiano });
-                patch({ includePiano });
-              }}
-            />
-            Include piano
+          <label className="flex flex-col gap-2 touch-manipulation">
+            <span className="flex min-h-11 items-center gap-2">
+              <input
+                type="checkbox"
+                className="h-4 w-4"
+                checked={prefs.includePiano !== false}
+                onChange={(e) => {
+                  const includePiano = e.target.checked;
+                  setPrefs({ ...prefs, includePiano });
+                  patch({ includePiano });
+                }}
+              />
+              Include piano
+            </span>
           </label>
         </div>
       ) : null}
@@ -533,13 +659,6 @@ export function DigestSettingsCard() {
           </p>
         ) : null}
       </div>
-
-      {message ? (
-        <p className="text-sm text-[var(--accent)]">{message}</p>
-      ) : null}
-      {error ? (
-        <p className="text-sm text-[var(--danger)]">{error}</p>
-      ) : null}
     </section>
   );
 }

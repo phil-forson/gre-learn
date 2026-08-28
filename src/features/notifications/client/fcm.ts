@@ -5,6 +5,7 @@ import {
   getFirebaseMessaging,
   readFirebaseClientConfig,
 } from "@/lib/firebase/client";
+import { readPushEnvironment } from "@/features/notifications/client/push-diagnostics";
 
 export type FcmRegistrationResult =
   | { ok: true; token: string }
@@ -22,6 +23,30 @@ async function getServiceWorkerRegistration(): Promise<
 }
 
 export async function registerFcmToken(): Promise<FcmRegistrationResult> {
+  const env = readPushEnvironment();
+  if (!env.notificationsApi) {
+    return {
+      ok: false,
+      reason: "Notifications are not supported in this browser.",
+    };
+  }
+
+  if (env.ios && !env.standalone) {
+    return {
+      ok: false,
+      reason:
+        "On iPhone, open gre-learn from the Home Screen icon (not Safari). Add via Share → Add to Home Screen first.",
+    };
+  }
+
+  if (env.permission === "denied") {
+    return {
+      ok: false,
+      reason:
+        "Notifications are blocked. iPhone: Settings → Notifications → GRE Learn → Allow Notifications, then try again.",
+    };
+  }
+
   const config = readFirebaseClientConfig();
   if (!config) {
     return {
@@ -31,18 +56,24 @@ export async function registerFcmToken(): Promise<FcmRegistrationResult> {
     };
   }
 
-  if (typeof window === "undefined" || !("Notification" in window)) {
-    return { ok: false, reason: "Notifications are not supported in this browser." };
-  }
-
   const permission = await Notification.requestPermission();
   if (permission !== "granted") {
-    return { ok: false, reason: "Notification permission was not granted." };
+    return {
+      ok: false,
+      reason:
+        permission === "denied"
+          ? "Notification permission was denied. Enable in iPhone Settings → Notifications → GRE Learn."
+          : "Notification permission was not granted.",
+    };
   }
 
   const messaging = await getFirebaseMessaging(config);
   if (!messaging) {
-    return { ok: false, reason: "Firebase Messaging is not supported here." };
+    return {
+      ok: false,
+      reason:
+        "Firebase Messaging is not supported in this browser (iOS 16.4+ required on iPhone).",
+    };
   }
 
   const registration = await getServiceWorkerRegistration();
@@ -57,16 +88,19 @@ export async function registerFcmToken(): Promise<FcmRegistrationResult> {
       serviceWorkerRegistration: registration,
     });
     if (!token) {
-      return { ok: false, reason: "Could not obtain an FCM token." };
+      return {
+        ok: false,
+        reason:
+          "Could not obtain an FCM token. Check Firebase Web Push certificate (VAPID) matches NEXT_PUBLIC_FIREBASE_VAPID_KEY on Vercel.",
+      };
     }
     return { ok: true, token };
   } catch (error) {
+    const detail =
+      error instanceof Error ? error.message : "Unknown registration error";
     return {
       ok: false,
-      reason:
-        error instanceof Error
-          ? error.message
-          : "Failed to register for push notifications.",
+      reason: `Push registration failed: ${detail}`,
     };
   }
 }

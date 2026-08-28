@@ -91,7 +91,9 @@ export function AppNav() {
             <Link
               key={link.href}
               href={link.href}
-              className={`inline-flex min-h-11 touch-manipulation select-none items-center whitespace-nowrap rounded-full px-3 py-2 transition-colors ${
+              prefetch={false}
+              scroll={false}
+              className={`relative z-10 inline-flex min-h-11 shrink-0 touch-manipulation select-none items-center whitespace-nowrap rounded-full px-3 py-2 transition-colors ${
                 active
                   ? "bg-[var(--accent-soft)] font-medium text-[var(--accent)]"
                   : "text-[var(--ink-muted)] active:bg-[var(--overlay)] active:text-[var(--ink)] [@media(hover:hover)_and_(pointer:fine)]:hover:bg-[var(--overlay)] [@media(hover:hover)_and_(pointer:fine)]:hover:text-[var(--ink)]"
