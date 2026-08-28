@@ -1,4 +1,4 @@
-import { DIGEST_BRAND, type DigestBuildInput, type DigestPayload } from "@/features/notifications/types";
+import { DIGEST_BRAND, type DigestBuildInput, type DigestGrammarSnippet, type DigestPayload } from "@/features/notifications/types";
 
 const MAX_GRAMMAR_TITLES = 2;
 const MAX_VOCAB_SNIPPETS = 2;
@@ -74,6 +74,32 @@ function continueUrl(href: string, needsPlacement: boolean): string {
   return isSafeAppPath(href) ? href : "/path";
 }
 
+function grammarUnitUrl(snippet: { unitId: string; slug?: string }): string {
+  const slug = snippet.slug ?? snippet.unitId;
+  return `/grammar/${slug}`;
+}
+
+function shortGrammarTitle(title: string): string {
+  const short = title.split(":")[0]?.trim() ?? title;
+  return truncate(short, 48);
+}
+
+function formatGrammarTipBody(snippet: DigestGrammarSnippet): string {
+  const title = shortGrammarTitle(snippet.title);
+  const rule = snippet.ruleLine
+    ? truncate(snippet.ruleLine.replace(/\s+/g, " ").trim(), 90)
+    : "Open the lesson for examples.";
+  return truncate(`Grammar tip: ${title} — ${rule}`, MAX_BODY);
+}
+
+function formatGrammarTipAddon(snippet: DigestGrammarSnippet): string {
+  const title = shortGrammarTitle(snippet.title);
+  const rule = snippet.ruleLine
+    ? truncate(snippet.ruleLine.replace(/\s+/g, " ").trim(), 55)
+    : title;
+  return `Tip: ${rule}`;
+}
+
 /**
  * Pure “Today’s English” digest builder.
  * Returns null when the digest should not be sent (idempotent / quiet / skip empty).
@@ -96,6 +122,7 @@ export function buildDailyDigest(
 
   const includePiano = prefs.includePiano !== false;
   const grammar = prefs.includeGrammar ? input.grammar : [];
+  const grammarTip = prefs.includeGrammar ? (input.grammarTip ?? null) : null;
   const vocabNew = prefs.includeVocab ? input.vocabNew : [];
   const vocabReviewed = prefs.includeVocab ? input.vocabReviewed : [];
   const piano = includePiano ? (input.piano ?? []) : [];
@@ -106,7 +133,22 @@ export function buildDailyDigest(
   const hasActivity = hasEnglishActivity || hasPianoActivity;
 
   if (!hasActivity) {
-    if (prefs.skipEmptyDays) return null;
+    if (prefs.skipEmptyDays && !grammarTip) return null;
+
+    if (grammarTip) {
+      return {
+        title: DIGEST_BRAND,
+        body: formatGrammarTipBody(grammarTip),
+        url: grammarUnitUrl(grammarTip),
+        kind: "grammar-tip",
+        localDay,
+        grammarCount: 0,
+        vocabNewCount: 0,
+        vocabReviewedCount: 0,
+        pianoCount: 0,
+      };
+    }
+
     const kind = continueTarget.needsPlacement ? "placement" : "continue";
     return {
       title: DIGEST_BRAND,
@@ -163,6 +205,10 @@ export function buildDailyDigest(
   if (piano.length > 0) {
     const label = piano[0]!.label;
     parts.push(`Piano: ${label}`);
+  }
+
+  if (grammarTip) {
+    parts.push(formatGrammarTipAddon(grammarTip));
   }
 
   const body = truncate(parts.join(" · "), MAX_BODY);

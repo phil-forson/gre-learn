@@ -102,12 +102,49 @@ describe("buildDailyDigest", () => {
     const payload = buildDailyDigest(
       baseInput({
         now: new Date("2026-08-28T19:00:00.000Z"),
+        grammarTip: null,
       }),
     );
     expect(payload!.kind).toBe("continue");
     expect(payload!.body).toContain("Next:");
     expect(payload!.body).toContain("Present perfect");
     expect(payload!.url).toBe("/grammar/present-perfect-experience");
+  });
+
+  it("empty day with grammar tip uses lesson deep link", () => {
+    const payload = buildDailyDigest(
+      baseInput({
+        now: new Date("2026-08-28T19:00:00.000Z"),
+        grammarTip: {
+          unitId: "conditionals-zero-first-second",
+          slug: "conditionals-zero-first-second",
+          title: "Conditionals: Zero, First & Second",
+          ruleLine: "Use the zero conditional for general truths.",
+        },
+      }),
+    );
+    expect(payload!.kind).toBe("grammar-tip");
+    expect(payload!.body).toContain("Grammar tip:");
+    expect(payload!.body).toContain("Conditionals");
+    expect(payload!.url).toBe("/grammar/conditionals-zero-first-second");
+  });
+
+  it("active day can append a random grammar tip", () => {
+    const payload = buildDailyDigest(
+      baseInput({
+        now: new Date("2026-08-28T19:00:00.000Z"),
+        vocabNew: [{ word: "ephemeral", definition: "short-lived" }],
+        grammarTip: {
+          unitId: "past-perfect",
+          slug: "past-perfect",
+          title: "Past Perfect",
+          ruleLine: "Use had + past participle for the earlier of two past events.",
+        },
+      }),
+    );
+    expect(payload!.body).toContain("Vocab:");
+    expect(payload!.body).toContain("Tip:");
+    expect(payload!.body).toContain("had + past participle");
   });
 
   it("placement-needed empty day deep-links to placement", () => {

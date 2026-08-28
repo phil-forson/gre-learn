@@ -369,9 +369,9 @@ export function DigestSettingsCard() {
           Today’s English
         </h2>
         <p className="mt-1 text-sm text-[var(--ink-muted)]">
-          Evening habit reminder: grammar and vocab from today, or a specific
-          next step when the day was quiet. Install to your home screen for the
-          easiest open.
+          Evening habit reminder: grammar and vocab from today, a random grammar
+          tip (~half of evenings), or a specific next step when the day was
+          quiet. Install to your home screen for the easiest open.
         </p>
       </div>
 
@@ -590,7 +590,7 @@ export function DigestSettingsCard() {
                   patch({ includeGrammar });
                 }}
               />
-              Include grammar
+              Include grammar (today’s units + random tips)
             </span>
           </label>
           <label className="flex flex-col gap-2 touch-manipulation">

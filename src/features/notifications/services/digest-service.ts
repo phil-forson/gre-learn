@@ -11,6 +11,7 @@ import {
   buildDailyDigest,
   localDayKey,
 } from "@/features/notifications/services/digest-builder";
+import { grammarTipForDigest, pickGrammarTip } from "@/features/notifications/services/grammar-tip-picker";
 import type {
   DigestGrammarSnippet,
   DigestPayload,
@@ -167,11 +168,20 @@ export async function buildDigestForUser(
   now: Date = new Date(),
   options?: { force?: boolean },
 ): Promise<DigestPayload | null> {
-  const [{ grammar, vocabNew, vocabReviewed, piano }, continueTarget] =
+  const localDay = localDayKey(now, prefs.timezone || "UTC");
+  const [{ grammar, vocabNew, vocabReviewed, piano }, continueTarget, units] =
     await Promise.all([
       collectDigestActivity(prefs, now),
       resolveContinueTarget(),
+      prefs.includeGrammar ? listGrammarUnits() : Promise.resolve([]),
     ]);
+
+  const grammarTip =
+    prefs.includeGrammar && units.length > 0
+      ? options?.force
+        ? pickGrammarTip(units, prefs.userId, localDay)
+        : grammarTipForDigest(units, prefs.userId, localDay)
+      : null;
 
   return buildDailyDigest({
     prefs,
@@ -180,6 +190,7 @@ export async function buildDigestForUser(
     vocabNew,
     vocabReviewed,
     piano,
+    grammarTip,
     force: options?.force,
     continueTarget: {
       href: continueTarget.href,

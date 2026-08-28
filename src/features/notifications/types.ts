@@ -35,6 +35,7 @@ export type DigestVocabSnippet = {
 
 export type DigestGrammarSnippet = {
   unitId: string;
+  slug?: string;
   title: string;
   ruleLine?: string;
 };
@@ -49,7 +50,7 @@ export type DigestPayload = {
   body: string;
   /** In-app path only (must start with `/`). */
   url: string;
-  kind: "active" | "continue" | "placement";
+  kind: "active" | "continue" | "placement" | "grammar-tip";
   localDay: string;
   grammarCount: number;
   vocabNewCount: number;
@@ -64,6 +65,8 @@ export type DigestBuildInput = {
   vocabNew: DigestVocabSnippet[];
   vocabReviewed: DigestVocabSnippet[];
   piano?: DigestPianoSnippet[];
+  /** Random curated tip from the grammar catalog (not today's activity). */
+  grammarTip?: DigestGrammarSnippet | null;
   continueTarget: {
     href: string;
     label: string;
