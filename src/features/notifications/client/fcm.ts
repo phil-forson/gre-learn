@@ -98,9 +98,14 @@ export async function registerFcmToken(): Promise<FcmRegistrationResult> {
   } catch (error) {
     const detail =
       error instanceof Error ? error.message : "Unknown registration error";
+    const hint =
+      /invalid character/i.test(detail) ||
+      /applicationServerKey/i.test(detail)
+        ? " Check NEXT_PUBLIC_FIREBASE_VAPID_KEY — use only the key string (no quotes or inline # comments)."
+        : "";
     return {
       ok: false,
-      reason: `Push registration failed: ${detail}`,
+      reason: `Push registration failed: ${detail}${hint}`,
     };
   }
 }

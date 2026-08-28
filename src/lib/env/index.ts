@@ -1,4 +1,8 @@
 import { z } from "zod";
+import {
+  isLikelyVapidPublicKey,
+  sanitizePublicEnvValue,
+} from "@/lib/env/sanitize-public-env";
 
 const envSchema = z.object({
   DATA_DRIVER: z.enum(["local", "firebase"]).default("local"),
@@ -91,7 +95,10 @@ export function getProviderStatus() {
         env.NEXT_PUBLIC_FIREBASE_PROJECT_ID &&
         env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID &&
         env.NEXT_PUBLIC_FIREBASE_APP_ID &&
-        env.NEXT_PUBLIC_FIREBASE_VAPID_KEY,
+        (() => {
+          const vapid = sanitizePublicEnvValue(env.NEXT_PUBLIC_FIREBASE_VAPID_KEY);
+          return vapid && isLikelyVapidPublicKey(vapid);
+        })(),
     ),
     cronConfigured: Boolean(env.CRON_SECRET),
     notificationsAuthConfigured: Boolean(

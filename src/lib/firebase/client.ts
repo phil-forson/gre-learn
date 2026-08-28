@@ -1,5 +1,9 @@
 import { initializeApp, getApps, type FirebaseApp } from "firebase/app";
 import { getMessaging, isSupported, type Messaging } from "firebase/messaging";
+import {
+  isLikelyVapidPublicKey,
+  sanitizePublicEnvValue,
+} from "@/lib/env/sanitize-public-env";
 
 export type FirebaseClientConfig = {
   apiKey: string;
@@ -12,20 +16,32 @@ export type FirebaseClientConfig = {
 };
 
 export function readFirebaseClientConfig(): FirebaseClientConfig | null {
-  const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
-  const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
-  const messagingSenderId =
-    process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID;
-  const appId = process.env.NEXT_PUBLIC_FIREBASE_APP_ID;
-  const vapidKey = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY;
+  const apiKey = sanitizePublicEnvValue(process.env.NEXT_PUBLIC_FIREBASE_API_KEY);
+  const projectId = sanitizePublicEnvValue(
+    process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  );
+  const messagingSenderId = sanitizePublicEnvValue(
+    process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  );
+  const appId = sanitizePublicEnvValue(process.env.NEXT_PUBLIC_FIREBASE_APP_ID);
+  const vapidKey = sanitizePublicEnvValue(
+    process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY,
+  );
   if (!apiKey || !projectId || !messagingSenderId || !appId || !vapidKey) {
+    return null;
+  }
+  if (!isLikelyVapidPublicKey(vapidKey)) {
     return null;
   }
   return {
     apiKey,
-    authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+    authDomain: sanitizePublicEnvValue(
+      process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+    ),
     projectId,
-    storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+    storageBucket: sanitizePublicEnvValue(
+      process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+    ),
     messagingSenderId,
     appId,
     vapidKey,
