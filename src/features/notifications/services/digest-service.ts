@@ -165,6 +165,7 @@ export async function collectDigestActivity(
 export async function buildDigestForUser(
   prefs: NotificationPreferences,
   now: Date = new Date(),
+  options?: { force?: boolean },
 ): Promise<DigestPayload | null> {
   const [{ grammar, vocabNew, vocabReviewed, piano }, continueTarget] =
     await Promise.all([
@@ -179,6 +180,7 @@ export async function buildDigestForUser(
     vocabNew,
     vocabReviewed,
     piano,
+    force: options?.force,
     continueTarget: {
       href: continueTarget.href,
       label: continueTarget.label,

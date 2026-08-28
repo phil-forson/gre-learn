@@ -81,16 +81,16 @@ function continueUrl(href: string, needsPlacement: boolean): string {
 export function buildDailyDigest(
   input: DigestBuildInput,
 ): DigestPayload | null {
-  const { prefs, now, continueTarget } = input;
+  const { prefs, now, continueTarget, force = false } = input;
   const tz = prefs.timezone || "UTC";
   const localDay = localDayKey(now, tz);
 
-  if (prefs.lastDigestSentOn === localDay) {
+  if (!force && prefs.lastDigestSentOn === localDay) {
     return null;
   }
 
   const hour = localHour(now, tz);
-  if (isInQuietHours(hour, prefs.quietHoursStart, prefs.quietHoursEnd)) {
+  if (!force && isInQuietHours(hour, prefs.quietHoursStart, prefs.quietHoursEnd)) {
     return null;
   }
 

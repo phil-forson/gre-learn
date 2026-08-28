@@ -109,15 +109,15 @@ export async function sendTestDigest(): Promise<{
   }
 
   const tokens = await repo.listPushTokens(getUserId());
-  const payload = await buildDigestForUser(prefs);
+  const payload = await buildDigestForUser(prefs, new Date(), { force: true });
   if (!payload) {
     return {
-      ok: true,
+      ok: false,
       configured,
       payload: null,
       result: { sent: 0, failed: 0, errors: [] },
       message:
-        "No digest to send right now (already sent today, quiet hours, or skipped empty day).",
+        "Could not build a test digest. Check timezone and continue target.",
     };
   }
 
@@ -134,11 +134,12 @@ export async function sendTestDigest(): Promise<{
 
   if (tokens.length === 0) {
     return {
-      ok: true,
+      ok: false,
       configured,
       payload,
       result: { sent: 0, failed: 0, errors: [] },
-      message: "No push tokens registered for this device yet.",
+      message:
+        "No push tokens registered for this device yet. Tap Enable digests again to register this phone.",
     };
   }
 
@@ -146,6 +147,8 @@ export async function sendTestDigest(): Promise<{
     tokens.map((t) => t.token),
     payload,
   );
+  const errorDetail =
+    result.errors.length > 0 ? ` ${result.errors[0]}` : "";
   return {
     ok: result.sent > 0,
     configured,
@@ -154,7 +157,9 @@ export async function sendTestDigest(): Promise<{
     message:
       result.sent > 0
         ? `Sent test digest to ${result.sent} device(s).`
-        : "Failed to send test digest.",
+        : tokens.length === 0
+          ? "No push tokens registered for this device yet. Tap Enable digests again to register this phone."
+          : `Failed to send test digest.${errorDetail}`,
   };
 }
 

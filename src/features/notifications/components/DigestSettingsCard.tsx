@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { registerFcmToken } from "@/features/notifications/client/fcm";
+import {
+  listenForForegroundMessages,
+  registerFcmToken,
+} from "@/features/notifications/client/fcm";
 import type { NotificationPreferences } from "@/features/notifications/types";
 
 const PAIRING_STORAGE_KEY = "gre-learn-notifications-pairing";
@@ -31,6 +34,13 @@ export function DigestSettingsCard() {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+
+  useEffect(() => {
+    if (!prefs?.enabled) return;
+    return listenForForegroundMessages((title, body) => {
+      setMessage(`Received: ${title} — ${body}`);
+    });
+  }, [prefs?.enabled]);
 
   useEffect(() => {
     try {
@@ -190,6 +200,25 @@ export function DigestSettingsCard() {
     startTransition(async () => {
       try {
         const code = requirePairing();
+
+        const fcmResult = await registerFcmToken();
+        if (fcmResult.ok) {
+          const tokenRes = await fetch("/api/notifications/push-token", {
+            method: "POST",
+            headers: pairingHeaders(code),
+            body: JSON.stringify({
+              token: fcmResult.token,
+              userAgent: navigator.userAgent,
+            }),
+          });
+          if (!tokenRes.ok) {
+            const tokenData = await tokenRes.json();
+            throw new Error(
+              tokenData.error?.message ?? "Could not refresh push token",
+            );
+          }
+        }
+
         const res = await fetch("/api/notifications/test", {
           method: "POST",
           headers: pairingHeaders(code),
@@ -201,7 +230,21 @@ export function DigestSettingsCard() {
         const preview = data.preview
           ? ` “${data.preview.title}: ${data.preview.body}”`
           : "";
-        setMessage(`${data.message ?? "Test complete."}${preview}`);
+        const err =
+          data.result?.errors?.[0] && !data.ok
+            ? ` (${data.result.errors[0]})`
+            : "";
+        if (!fcmResult.ok) {
+          setMessage(
+            `${data.message ?? "Test complete."}${preview} Push token not refreshed: ${fcmResult.reason}`,
+          );
+          return;
+        }
+        if (!data.ok) {
+          setError(`${data.message ?? "Test send failed."}${preview}${err}`);
+          return;
+        }
+        setMessage(`${data.message ?? "Test complete."}${preview}${err}`);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Test send failed");
       }

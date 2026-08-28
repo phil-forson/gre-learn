@@ -161,6 +161,27 @@ describe("buildDailyDigest", () => {
     expect(payload).toBeNull();
   });
 
+  it("force bypasses idempotency and quiet hours for test sends", () => {
+    const prefs = {
+      ...defaultNotificationPreferences("default-user"),
+      enabled: true,
+      timezone: "UTC",
+      lastDigestSentOn: "2026-08-28",
+      quietHoursStart: 20,
+      quietHoursEnd: 8,
+    };
+    const payload = buildDailyDigest(
+      baseInput({
+        prefs,
+        force: true,
+        now: new Date("2026-08-28T22:00:00.000Z"),
+        grammar: [{ unitId: "u1", title: "Modals" }],
+      }),
+    );
+    expect(payload).not.toBeNull();
+    expect(payload!.body).toContain("Grammar");
+  });
+
   it("honors skipEmptyDays", () => {
     const prefs = {
       ...defaultNotificationPreferences("default-user"),

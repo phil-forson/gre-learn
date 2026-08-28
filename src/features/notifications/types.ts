@@ -69,4 +69,6 @@ export type DigestBuildInput = {
     label: string;
     needsPlacement: boolean;
   };
+  /** Test sends bypass idempotency + quiet hours. */
+  force?: boolean;
 };

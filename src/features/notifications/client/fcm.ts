@@ -1,6 +1,6 @@
 "use client";
 
-import { getToken } from "firebase/messaging";
+import { getToken, onMessage } from "firebase/messaging";
 import {
   getFirebaseMessaging,
   readFirebaseClientConfig,
@@ -9,6 +9,17 @@ import {
 export type FcmRegistrationResult =
   | { ok: true; token: string }
   | { ok: false; reason: string };
+
+async function getServiceWorkerRegistration(): Promise<
+  ServiceWorkerRegistration | undefined
+> {
+  if (typeof window === "undefined" || !("serviceWorker" in navigator)) {
+    return undefined;
+  }
+  const existing = await navigator.serviceWorker.getRegistration();
+  if (existing) return existing;
+  return navigator.serviceWorker.register("/sw.js", { scope: "/" });
+}
 
 export async function registerFcmToken(): Promise<FcmRegistrationResult> {
   const config = readFirebaseClientConfig();
@@ -34,14 +45,13 @@ export async function registerFcmToken(): Promise<FcmRegistrationResult> {
     return { ok: false, reason: "Firebase Messaging is not supported here." };
   }
 
-  let registration: ServiceWorkerRegistration | undefined;
-  if ("serviceWorker" in navigator) {
-    registration =
-      (await navigator.serviceWorker.getRegistration()) ??
-      (await navigator.serviceWorker.register("/sw.js"));
+  const registration = await getServiceWorkerRegistration();
+  if (!registration) {
+    return { ok: false, reason: "Could not register the service worker." };
   }
 
   try {
+    await navigator.serviceWorker.ready;
     const token = await getToken(messaging, {
       vapidKey: config.vapidKey,
       serviceWorkerRegistration: registration,
@@ -59,4 +69,41 @@ export async function registerFcmToken(): Promise<FcmRegistrationResult> {
           : "Failed to register for push notifications.",
     };
   }
+}
+
+/** Show a banner when FCM arrives while the app is open (e.g. Send test). */
+export function listenForForegroundMessages(
+  onReceive?: (title: string, body: string) => void,
+): (() => void) | undefined {
+  if (typeof window === "undefined") return undefined;
+
+  const config = readFirebaseClientConfig();
+  if (!config) return undefined;
+
+  let cancelled = false;
+  void (async () => {
+    const messaging = await getFirebaseMessaging(config);
+    if (!messaging || cancelled) return;
+
+    onMessage(messaging, (payload) => {
+      const title = payload.notification?.title ?? "Today's English";
+      const body = payload.notification?.body ?? "Open gre-learn to continue.";
+      onReceive?.(title, body);
+      if (Notification.permission === "granted") {
+        try {
+          new Notification(title, {
+            body,
+            icon: "/icons/icon-192.png",
+            data: { url: payload.data?.url ?? "/" },
+          });
+        } catch {
+          /* ignore — in-app toast still shown */
+        }
+      }
+    });
+  })();
+
+  return () => {
+    cancelled = true;
+  };
 }
