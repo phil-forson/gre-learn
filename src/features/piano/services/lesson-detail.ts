@@ -8,7 +8,10 @@ import {
   ALL_MAJOR_KEYS,
   type FingeringDisplay,
 } from "@/features/piano/curriculum/scale-fingerings";
-import { PIANO_SOURCES } from "@/features/piano/curriculum/sources";
+import {
+  formatScaleTempoHowToUse,
+  getScalePracticeTempo,
+} from "@/features/piano/curriculum/scale-tempos";
 import {
   KEY_TRACKING_SKILL_IDS,
   SCALE_FINGERING_SKILL_IDS,
@@ -75,19 +78,15 @@ function expandPlainText(text: string): string {
     .replace(/\bii-V-I\b/g, "2–5–1 (Dm7 → G7 → Cmaj7 in the key of C)");
 }
 
-function defaultTempoForSkill(skill: PianoSkill, key: string): LessonTempo {
-  const fingering = getMajorScaleFingering(key);
-  const start = fingering?.tempoStartBpm ?? 72;
-  const target = fingering?.tempoTargetBpm ?? 104;
-  const rcmNote =
-    skill.id === "sk_rcm_scales"
-      ? ` (${PIANO_SOURCES.rcmSyllabi.title})`
-      : "";
+function defaultTempoForSkill(skill: PianoSkill): LessonTempo {
+  const { startBpm, targetBpm, noteValue } = getScalePracticeTempo();
   return {
-    startBpm: start,
-    targetBpm: target,
-    noteValue: "quarter note (♩)",
-    howToUse: `Set metronome to ${start} BPM. Each click = one quarter note. When you play 4 clean two-octave reps in a row with even tone, raise by 4 BPM until you reach ${target} BPM.${rcmNote}`,
+    startBpm,
+    targetBpm,
+    noteValue,
+    howToUse: formatScaleTempoHowToUse(startBpm, targetBpm, noteValue, {
+      rcmLabel: skill.id === "sk_rcm_scales",
+    }),
   };
 }
 
@@ -97,7 +96,7 @@ export function resolveLessonTempo(
   focusKey: string,
 ): LessonTempo | null {
   if (SCALE_FINGERING_SKILL_IDS.has(skill.id)) {
-    return defaultTempoForSkill(skill, focusKey);
+    return defaultTempoForSkill(skill);
   }
   if (!skill.lesson.tempo) return null;
   const t = skill.lesson.tempo;
@@ -120,12 +119,13 @@ function enrichStepsForKeySkill(
     (skill.id === "sk_major_scale_lab" || skill.id === "sk_rcm_scales") &&
     f
   ) {
+    const { startBpm, targetBpm } = getScalePracticeTempo();
     const rhPattern = buildFingeringDisplay(key)?.rightHand.pattern ?? "";
     const lhPattern = buildFingeringDisplay(key)?.leftHand.pattern ?? "";
     return [
       `Today's key: ${key} major. Use the fingering chart below — right hand groups: ${rhPattern}; left hand groups: ${lhPattern}.`,
-      `Hands separate first: one octave each hand at ${f.tempoStartBpm} BPM until even. Then hands together for two octaves.`,
-      `Do not speed up until 4 consecutive clean reps — then add 4 BPM. Target: ${f.tempoTargetBpm} BPM hands together, two octaves.`,
+      `Hands separate first: one octave each hand at ${startBpm} BPM (eighth notes) until even. Then hands together for two octaves.`,
+      `Do not speed up until 4 consecutive clean reps — then add 4 BPM. Target: ${targetBpm} BPM hands together, two octaves.`,
       skill.id === "sk_major_scale_lab"
         ? `Sing scale degrees while you play: 1–2–3–4–5–6–7–8, then back down.`
         : `Add relative harmonic minor in ${key} after the major scale (same session, same key).`,
@@ -133,8 +133,9 @@ function enrichStepsForKeySkill(
   }
 
   if (skill.id === "sk_seven_modes" && f) {
+    const { startBpm } = getScalePracticeTempo();
     return [
-      `Parent major scale today: ${key} major. Play it once hands together (two octaves) at ${f.tempoStartBpm} BPM.`,
+      `Parent major scale today: ${key} major. Play it once hands together (two octaves) at ${startBpm} BPM (eighth notes).`,
       `From that parent, play each mode starting on its root for one octave (Ionian on ${key}, Dorian on 2, Phrygian on 3, etc.).`,
       `Name the characteristic tone for each mode aloud (e.g. Mixolydian = lowered 7th).`,
       `End by playing the parent ${key} major scale once more to reset your ear.`,
@@ -202,18 +203,19 @@ export function buildBlockLessonDetail(
   const tempo = resolveLessonTempo(skill, focusKey);
   const showFingering = SCALE_FINGERING_SKILL_IDS.has(skill.id);
   const fingering = showFingering ? buildFingeringDisplay(focusKey) : null;
+  const scaleTempo = getScalePracticeTempo();
 
   return {
     why: expandPlainText(skill.lesson.why),
     steps,
     exercise: expandPlainText(
       useScaleOverlay
-        ? `${focusKey} major: two octaves hands together at ${f!.tempoStartBpm} BPM, then ${skill.lesson.exercise}`
+        ? `${focusKey} major: two octaves hands together at ${scaleTempo.startBpm} BPM (eighth notes), then ${skill.lesson.exercise}`
         : skill.lesson.exercise,
     ),
     passRule: expandPlainText(
       useScaleOverlay
-        ? `${focusKey} major: 4 clean two-octave hands-together reps at ${f!.tempoStartBpm} BPM without stopping or rushing thumb crossings. Then ${skill.lesson.passRule}`
+        ? `${focusKey} major: 4 clean two-octave hands-together reps at ${scaleTempo.startBpm} BPM (eighth notes) without stopping or rushing thumb crossings. Then ${skill.lesson.passRule}`
         : skill.lesson.passRule,
     ),
     tip: skill.lesson.tip ? expandPlainText(skill.lesson.tip) : undefined,

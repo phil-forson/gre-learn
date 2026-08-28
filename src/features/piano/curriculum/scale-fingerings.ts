@@ -7,9 +7,6 @@ export type ScaleFingering = {
   notes: string[];
   rightHandAscending: number[];
   leftHandAscending: number[];
-  /** RCM-style target for 2-octave hands-together major scale. */
-  tempoTargetBpm: number;
-  tempoStartBpm: number;
 };
 
 /** Verified against pianoscales.org one-octave major scale charts. */
@@ -29,40 +26,30 @@ export const MAJOR_SCALE_FINGERINGS: Record<string, ScaleFingering> = {
     notes: ["C", "D", "E", "F", "G", "A", "B", "C"],
     rightHandAscending: [1, 2, 3, 1, 2, 3, 4, 5],
     leftHandAscending: [5, 4, 3, 2, 1, 3, 2, 1],
-    tempoStartBpm: 72,
-    tempoTargetBpm: 104,
   },
   G: {
     key: "G",
     notes: ["G", "A", "B", "C", "D", "E", "F#", "G"],
     rightHandAscending: [1, 2, 3, 1, 2, 3, 4, 5],
     leftHandAscending: [5, 4, 3, 2, 1, 3, 2, 1],
-    tempoStartBpm: 72,
-    tempoTargetBpm: 104,
   },
   D: {
     key: "D",
     notes: ["D", "E", "F#", "G", "A", "B", "C#", "D"],
     rightHandAscending: [1, 2, 3, 1, 2, 3, 4, 5],
     leftHandAscending: [5, 4, 3, 2, 1, 3, 2, 1],
-    tempoStartBpm: 72,
-    tempoTargetBpm: 104,
   },
   A: {
     key: "A",
     notes: ["A", "B", "C#", "D", "E", "F#", "G#", "A"],
     rightHandAscending: [1, 2, 3, 1, 2, 3, 4, 5],
     leftHandAscending: [5, 4, 3, 2, 1, 3, 2, 1],
-    tempoStartBpm: 72,
-    tempoTargetBpm: 104,
   },
   E: {
     key: "E",
     notes: ["E", "F#", "G#", "A", "B", "C#", "D#", "E"],
     rightHandAscending: [1, 2, 3, 1, 2, 3, 4, 5],
     leftHandAscending: [5, 4, 3, 2, 1, 3, 2, 1],
-    tempoStartBpm: 72,
-    tempoTargetBpm: 104,
   },
   B: {
     key: "B",
@@ -70,56 +57,42 @@ export const MAJOR_SCALE_FINGERINGS: Record<string, ScaleFingering> = {
     // CAGED right hand (same as C/G/D/A/E); left hand starts on 4 to keep thumb on white keys.
     rightHandAscending: [1, 2, 3, 1, 2, 3, 4, 5],
     leftHandAscending: [4, 3, 2, 1, 4, 3, 2, 1],
-    tempoStartBpm: 66,
-    tempoTargetBpm: 96,
   },
   "F#": {
     key: "F#",
     notes: ["F#", "G#", "A#", "B", "C#", "D#", "E#", "F#"],
     rightHandAscending: [2, 3, 4, 1, 2, 3, 1, 2],
     leftHandAscending: [4, 3, 2, 1, 3, 2, 1, 4],
-    tempoStartBpm: 66,
-    tempoTargetBpm: 96,
   },
   Db: {
     key: "Db",
     notes: ["Db", "Eb", "F", "Gb", "Ab", "Bb", "C", "Db"],
     rightHandAscending: [2, 3, 1, 2, 3, 4, 1, 2],
     leftHandAscending: [3, 2, 1, 4, 3, 2, 1, 3],
-    tempoStartBpm: 66,
-    tempoTargetBpm: 96,
   },
   Ab: {
     key: "Ab",
     notes: ["Ab", "Bb", "C", "Db", "Eb", "F", "G", "Ab"],
     rightHandAscending: [3, 4, 1, 2, 3, 1, 2, 3],
     leftHandAscending: [3, 2, 1, 4, 3, 2, 1, 3],
-    tempoStartBpm: 66,
-    tempoTargetBpm: 96,
   },
   Eb: {
     key: "Eb",
     notes: ["Eb", "F", "G", "Ab", "Bb", "C", "D", "Eb"],
     rightHandAscending: [3, 1, 2, 3, 4, 1, 2, 3],
     leftHandAscending: [3, 2, 1, 4, 3, 2, 1, 3],
-    tempoStartBpm: 68,
-    tempoTargetBpm: 100,
   },
   Bb: {
     key: "Bb",
     notes: ["Bb", "C", "D", "Eb", "F", "G", "A", "Bb"],
     rightHandAscending: [2, 1, 2, 3, 1, 2, 3, 4],
     leftHandAscending: [3, 2, 1, 4, 3, 2, 1, 3],
-    tempoStartBpm: 72,
-    tempoTargetBpm: 104,
   },
   F: {
     key: "F",
     notes: ["F", "G", "A", "Bb", "C", "D", "E", "F"],
     rightHandAscending: [1, 2, 3, 4, 1, 2, 3, 4],
     leftHandAscending: [5, 4, 3, 2, 1, 3, 2, 1],
-    tempoStartBpm: 72,
-    tempoTargetBpm: 104,
   },
 };
 

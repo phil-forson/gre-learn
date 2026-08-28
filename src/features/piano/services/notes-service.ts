@@ -14,6 +14,10 @@ import {
   summarizeYoutubeNote,
 } from "./note-summarize";
 import { getOrCreatePianoProfile } from "./profile-service";
+import {
+  fetchYoutubeTranscript,
+  youtubeWatchUrl,
+} from "./youtube-transcript";
 
 function getUserId(): string {
   return getEnv().DEFAULT_USER_ID;
@@ -35,8 +39,39 @@ export async function createYoutubeNote(raw: unknown): Promise<YoutubeNote> {
     );
   }
 
-  const normalized = normalizeNoteText(parsed.data.rawText);
+  const pastedText = parsed.data.rawText?.trim() ?? "";
+  let resolvedText = pastedText;
+  let resolvedUrl = parsed.data.url?.trim();
+  let fetchedFromYoutube = false;
+
+  if (!resolvedText && resolvedUrl) {
+    const transcript = await fetchYoutubeTranscript(resolvedUrl);
+    resolvedText = transcript.text;
+    resolvedUrl = youtubeWatchUrl(transcript.videoId);
+    fetchedFromYoutube = true;
+  }
+
+  if (!resolvedText) {
+    throw new AppError(
+      "Nothing to save — add a YouTube URL or paste notes.",
+      "VALIDATION_ERROR",
+      400,
+    );
+  }
+
+  const normalized = normalizeNoteText(resolvedText);
   const contentHash = hashNoteText(normalized);
+
+  const repo = getPianoRepository();
+  const existing = await repo.listNotes(getUserId());
+  if (existing.some((n) => n.contentHash === contentHash && n.status !== "archived")) {
+    throw new AppError(
+      "You already saved this lesson (same transcript text).",
+      "DUPLICATE_NOTE",
+      409,
+    );
+  }
+
   const summarized = await summarizeYoutubeNote(normalized);
   const skillTagIds = summarized.skillSlugs
     .map((slug) => getSkillBySlug(slug)?.id)
@@ -46,9 +81,9 @@ export async function createYoutubeNote(raw: unknown): Promise<YoutubeNote> {
   const note: YoutubeNote = {
     id: createId("ytnote"),
     userId: getUserId(),
-    url: parsed.data.url,
+    url: resolvedUrl,
     channelHint: parsed.data.channelHint,
-    rawText: parsed.data.rawText,
+    rawText: resolvedText,
     summary: summarized.summary,
     skillTagIds,
     practicePrompts: summarized.practicePrompts,
@@ -58,7 +93,15 @@ export async function createYoutubeNote(raw: unknown): Promise<YoutubeNote> {
     dateUpdated: now,
   };
 
-  return getPianoRepository().upsertNote(note);
+  const saved = await repo.upsertNote(note);
+
+  const shouldMap =
+    parsed.data.mapToPlan !== false &&
+    (fetchedFromYoutube || parsed.data.mapToPlan === true);
+  if (shouldMap) {
+    return mapNoteToPlan(saved.id);
+  }
+  return saved;
 }
 
 export async function mapNoteToPlan(noteId: string): Promise<YoutubeNote> {

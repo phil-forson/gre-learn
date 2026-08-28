@@ -1,4 +1,7 @@
-import { defaultNotificationPreferences } from "@/features/notifications/defaults";
+import {
+  defaultNotificationPreferences,
+  normalizeNotificationPreferences,
+} from "@/features/notifications/defaults";
 import {
   notificationPreferencesSchema,
   pushDeviceTokenSchema,
@@ -80,11 +83,12 @@ export class FirebaseNotificationRepository implements NotificationRepository {
   ): Promise<NotificationPreferences> {
     const existing = await this.findPrefsByUserId(userId);
     if (existing) {
-      const withPiano = {
+      const normalized = normalizeNotificationPreferences({
         ...existing,
-        includePiano: existing.includePiano !== false,
-      };
-      const parsed = notificationPreferencesSchema.safeParse(withPiano);
+        id: existing.id,
+        userId: existing.userId,
+      });
+      const parsed = notificationPreferencesSchema.safeParse(normalized);
       if (parsed.success) return parsed.data;
       return this.writePrefs({
         ...defaultNotificationPreferences(userId),
@@ -98,6 +102,9 @@ export class FirebaseNotificationRepository implements NotificationRepository {
     userId: string,
     patch: PatchNotificationPreferencesInput & {
       lastDigestSentOn?: string | null;
+      pianoTipsSentOn?: string | null;
+      pianoTipsSentCount?: number;
+      lastPianoTipSentAt?: string | null;
     },
   ): Promise<NotificationPreferences> {
     const current = await this.getOrCreatePreferences(userId);
@@ -119,7 +126,11 @@ export class FirebaseNotificationRepository implements NotificationRepository {
     return snap.docs
       .map((d) => {
         const data = d.data() as NotificationPreferences;
-        return { ...data, id: data.id || d.id };
+        return normalizeNotificationPreferences({
+          ...data,
+          id: data.id || d.id,
+          userId: data.userId,
+        });
       })
       .filter((p) => notificationPreferencesSchema.safeParse(p).success);
   }

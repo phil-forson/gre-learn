@@ -64,11 +64,27 @@ export default async function PianoTodayPage() {
                 className="rounded-xl border border-dashed border-[var(--line)] px-4 py-3"
               >
                 <p className="text-sm text-[var(--ink)]">{n.summary}</p>
+                {n.url ? (
+                  <a
+                    href={n.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-1 inline-block text-xs text-[var(--accent)] underline-offset-4 hover:underline"
+                  >
+                    Open video
+                  </a>
+                ) : null}
                 <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-[var(--ink-muted)]">
                   {n.prompts.map((p) => (
                     <li key={p}>{p}</li>
                   ))}
                 </ul>
+                <Link
+                  href="/piano/notes"
+                  className="mt-2 inline-block text-xs text-[var(--ink-muted)] underline-offset-4 hover:underline"
+                >
+                  Review full transcript
+                </Link>
               </li>
             ))}
           </ul>

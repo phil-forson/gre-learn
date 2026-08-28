@@ -48,6 +48,7 @@ export type TodayPlan = {
     noteId: string;
     summary: string;
     prompts: string[];
+    url?: string;
   }>;
   session: PracticeSession | null;
   completedMinutes: number;
@@ -124,6 +125,7 @@ export async function getTodayPlan(
     noteId: n.id,
     summary: n.summary,
     prompts: n.practicePrompts,
+    url: n.url,
   }));
 
   const completedMinutes = blocks

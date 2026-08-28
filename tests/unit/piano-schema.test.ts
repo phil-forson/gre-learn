@@ -84,14 +84,30 @@ describe("piano schemas", () => {
     expect(
       createYoutubeNoteSchema.safeParse({
         rawText: "Gospel 2-5-1 walkup notes",
-        url: "https://youtube.com/watch?v=abc",
+        url: "https://www.youtube.com/watch?v=abcdefghijk",
       }).success,
     ).toBe(true);
 
     expect(
       createYoutubeNoteSchema.safeParse({
+        url: "https://www.youtube.com/watch?v=abcdefghijk",
+      }).success,
+    ).toBe(true);
+
+    expect(
+      createYoutubeNoteSchema.safeParse({}).success,
+    ).toBe(false);
+
+    expect(
+      createYoutubeNoteSchema.safeParse({
         rawText: "notes",
-        url: "ftp://bad.example",
+        url: "ftp://bad.example/video",
+      }).success,
+    ).toBe(false);
+
+    expect(
+      createYoutubeNoteSchema.safeParse({
+        url: "https://example.com/not-youtube",
       }).success,
     ).toBe(false);
 

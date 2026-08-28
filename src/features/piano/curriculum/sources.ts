@@ -67,6 +67,11 @@ export const PIANO_SOURCES = {
     url: "https://bulletproofmusician.com/how-to-use-a-metronome/",
     note: "Slow practice, incremental tempo increases (+3–5 BPM)",
   },
+  rcmGrade5Scales: {
+    title: "PianoTV — Grade 5 RCM Technique Requirements",
+    url: "https://www.pianotv.net/2018/10/grade-5-rcm-technique-requirements/",
+    note: "Major scales HT 2 octaves at 104 BPM in eighth notes (RCM Grade 5 minimum, all keys)",
+  },
 } as const satisfies Record<string, LearningSource>;
 
 export const DOMAIN_DEFAULT_SOURCES: Record<string, LearningSource[]> = {

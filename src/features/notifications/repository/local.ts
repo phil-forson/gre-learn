@@ -1,4 +1,7 @@
-import { defaultNotificationPreferences } from "@/features/notifications/defaults";
+import {
+  defaultNotificationPreferences,
+  normalizeNotificationPreferences,
+} from "@/features/notifications/defaults";
 import {
   notificationPreferencesSchema,
   pushDeviceTokenSchema,
@@ -60,11 +63,12 @@ export class LocalNotificationRepository implements NotificationRepository {
   ): Promise<NotificationPreferences> {
     const existing = await this.vocabRepo.getNotificationPreferences(userId);
     if (existing) {
-      const withPiano = {
+      const normalized = normalizeNotificationPreferences({
         ...existing,
-        includePiano: existing.includePiano !== false,
-      };
-      const parsed = notificationPreferencesSchema.safeParse(withPiano);
+        id: existing.id,
+        userId: existing.userId,
+      });
+      const parsed = notificationPreferencesSchema.safeParse(normalized);
       if (parsed.success) return parsed.data;
       const fresh = {
         ...defaultNotificationPreferences(userId),
@@ -83,6 +87,9 @@ export class LocalNotificationRepository implements NotificationRepository {
     userId: string,
     patch: PatchNotificationPreferencesInput & {
       lastDigestSentOn?: string | null;
+      pianoTipsSentOn?: string | null;
+      pianoTipsSentCount?: number;
+      lastPianoTipSentAt?: string | null;
     },
   ): Promise<NotificationPreferences> {
     const current = await this.getOrCreatePreferences(userId);

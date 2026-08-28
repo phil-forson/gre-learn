@@ -1,7 +1,7 @@
 import { jsonError, jsonOk } from "@/lib/api";
 import { getEnv } from "@/lib/env";
 import { AppError } from "@/lib/errors";
-import { runDailyDigestCron } from "@/features/notifications/services/send-service";
+import { runDailyDigestCron, runPianoTipCron } from "@/features/notifications/services/send-service";
 
 function assertCronAuthorized(request: Request) {
   const secret = getEnv().CRON_SECRET;
@@ -23,7 +23,12 @@ async function handleCron(request: Request) {
   assertCronAuthorized(request);
   const url = new URL(request.url);
   const ignoreSendHour = url.searchParams.get("ignoreSendHour") === "1";
-  return runDailyDigestCron(new Date(), { ignoreSendHour });
+  const now = new Date();
+  const [digest, pianoTips] = await Promise.all([
+    runDailyDigestCron(now, { ignoreSendHour }),
+    runPianoTipCron(now),
+  ]);
+  return { digest, pianoTips };
 }
 
 /** Vercel Cron invokes GET with Authorization: Bearer CRON_SECRET */

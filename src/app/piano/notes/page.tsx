@@ -19,8 +19,8 @@ export default async function PianoNotesPage() {
           YouTube notes
         </h1>
         <p className="max-w-lg text-[var(--ink-muted)]">
-          Paste lesson notes (HearAndPlay, PianoGroove, etc.). We summarize and
-          tag skills — no scraping.
+          Paste a YouTube lesson link — we pull the caption transcript, summarize
+          it, and surface practice prompts on today&apos;s plan.
         </p>
       </section>
 

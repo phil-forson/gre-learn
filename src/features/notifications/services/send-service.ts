@@ -4,7 +4,13 @@ import { getFirebaseAdminApp } from "@/lib/db/firebase-admin";
 import { AppError } from "@/lib/errors";
 import { getNotificationRepository } from "@/features/notifications/repository";
 import { buildDigestForUser } from "@/features/notifications/services/digest-service";
-import { localHour } from "@/features/notifications/services/digest-builder";
+import { localHour, localDayKey } from "@/features/notifications/services/digest-builder";
+import {
+  buildPianoTipPayload,
+  pickPianoTip,
+  shouldSendPianoTipNow,
+  type PianoTipPayload,
+} from "@/features/notifications/services/piano-tip-picker";
 import type {
   DigestPayload,
   NotificationPreferences,
@@ -40,7 +46,23 @@ export function isFcmClientConfigured(): boolean {
 
 async function sendPayloadToTokens(
   tokens: string[],
-  payload: DigestPayload,
+  payload: DigestPayload | PianoTipPayload,
+): Promise<{ sent: number; failed: number; errors: string[] }> {
+  return sendPushPayload(tokens, payload);
+}
+
+export type PushSendPayload = {
+  title: string;
+  body: string;
+  url: string;
+  kind: string;
+  localDay: string;
+  tipId?: string;
+};
+
+export async function sendPushPayload(
+  tokens: string[],
+  payload: PushSendPayload,
 ): Promise<{ sent: number; failed: number; errors: string[] }> {
   if (tokens.length === 0) {
     return { sent: 0, failed: 0, errors: [] };
@@ -71,6 +93,7 @@ async function sendPayloadToTokens(
           url: payload.url,
           kind: payload.kind,
           localDay: payload.localDay,
+          ...(payload.tipId ? { tipId: payload.tipId } : {}),
         },
         webpush: {
           fcmOptions: {
@@ -266,6 +289,110 @@ export async function runDailyDigestCron(
         userId: prefs.userId,
         status: "failed",
         reason: result.errors[0] ?? "send failed",
+      });
+    }
+  }
+
+  return {
+    processed: enabled.length,
+    sent,
+    skipped,
+    failed,
+    details,
+  };
+}
+
+export type PianoTipCronResult = {
+  processed: number;
+  sent: number;
+  skipped: number;
+  failed: number;
+  details: Array<{
+    userId: string;
+    status: "sent" | "skipped" | "failed" | "no_tokens";
+    reason?: string;
+    tipId?: string;
+  }>;
+};
+
+export async function runPianoTipCron(
+  now: Date = new Date(),
+): Promise<PianoTipCronResult> {
+  const repo = getNotificationRepository();
+  const enabled = await repo.listEnabledPreferences();
+  const details: PianoTipCronResult["details"] = [];
+  let sent = 0;
+  let skipped = 0;
+  let failed = 0;
+
+  if (!getProviderStatus().firebaseConfigured) {
+    return {
+      processed: enabled.length,
+      sent: 0,
+      skipped: enabled.length,
+      failed: 0,
+      details: enabled.map((p) => ({
+        userId: p.userId,
+        status: "skipped" as const,
+        reason: "Firebase Admin not configured",
+      })),
+    };
+  }
+
+  for (const prefs of enabled) {
+    if (!shouldSendPianoTipNow(prefs, now)) {
+      skipped += 1;
+      details.push({
+        userId: prefs.userId,
+        status: "skipped",
+        reason: "window, quiet hours, cap, gap, or random skip",
+      });
+      continue;
+    }
+
+    const tz = prefs.timezone || "UTC";
+    const localDay = localDayKey(now, tz);
+    const localH = localHour(now, tz);
+    const entry = pickPianoTip(prefs.userId, localDay, localH);
+    const payload = buildPianoTipPayload(entry, localDay);
+
+    const tokens = await repo.listPushTokens(prefs.userId);
+    if (tokens.length === 0) {
+      skipped += 1;
+      details.push({
+        userId: prefs.userId,
+        status: "no_tokens",
+      });
+      continue;
+    }
+
+    const result = await sendPushPayload(
+      tokens.map((t) => t.token),
+      payload,
+    );
+
+    if (result.sent > 0) {
+      const sentOn = prefs.pianoTipsSentOn;
+      const priorCount =
+        sentOn === localDay ? (prefs.pianoTipsSentCount ?? 0) : 0;
+      await repo.updatePreferences(prefs.userId, {
+        pianoTipsSentOn: localDay,
+        pianoTipsSentCount: priorCount + 1,
+        lastPianoTipSentAt: now.toISOString(),
+      });
+      sent += 1;
+      details.push({
+        userId: prefs.userId,
+        status: "sent",
+        tipId: entry.id,
+      });
+    } else {
+      failed += 1;
+      details.push({
+        userId: prefs.userId,
+        status: "failed",
+        reason: result.errors[0] ?? "send failed",
+        tipId: entry.id,
       });
     }
   }

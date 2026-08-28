@@ -11,11 +11,19 @@ export const notificationPreferencesSchema = z.object({
   includeGrammar: z.boolean(),
   includeVocab: z.boolean(),
   includePiano: z.boolean().default(true),
+  includePianoTips: z.boolean().default(true),
   skipEmptyDays: z.boolean(),
   lastDigestSentOn: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/)
     .nullable(),
+  pianoTipsSentOn: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .nullable()
+    .default(null),
+  pianoTipsSentCount: z.number().int().min(0).default(0),
+  lastPianoTipSentAt: z.string().nullable().default(null),
   dateCreated: z.string().min(1),
   dateUpdated: z.string().min(1),
 });
@@ -30,6 +38,7 @@ export const patchNotificationPreferencesSchema = z
     includeGrammar: z.boolean().optional(),
     includeVocab: z.boolean().optional(),
     includePiano: z.boolean().optional(),
+    includePianoTips: z.boolean().optional(),
     skipEmptyDays: z.boolean().optional(),
   })
   .strict();

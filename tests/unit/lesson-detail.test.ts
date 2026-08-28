@@ -6,7 +6,7 @@ import {
 } from "@/features/piano/services/lesson-detail";
 
 describe("lesson-detail tempo consistency", () => {
-  it("uses per-key target in tempo box and steps (B major = 96)", () => {
+  it("uses same RCM tempo for every key (B major = 104 eighth, not 66 quarter)", () => {
     const skill = getSkill("sk_rcm_scales")!;
     const detail = buildBlockLessonDetail(skill, "B", []);
     const body = [
@@ -17,10 +17,12 @@ describe("lesson-detail tempo consistency", () => {
       detail.tempo?.howToUse ?? "",
     ].join(" ");
 
-    expect(detail.tempo?.targetBpm).toBe(96);
-    expect(detail.tempo?.startBpm).toBe(66);
-    expect(body).toContain("96 BPM");
-    expect(body).not.toContain("104 BPM");
+    expect(detail.tempo?.targetBpm).toBe(104);
+    expect(detail.tempo?.startBpm).toBe(88);
+    expect(detail.tempo?.noteValue).toContain("eighth");
+    expect(body).toContain("104 BPM");
+    expect(body).not.toContain("66 BPM");
+    expect(body).not.toContain("96 BPM");
   });
 
   it("key geography keeps its own exercise without scale overlay", () => {

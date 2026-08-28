@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { YOUTUBE_NOTE_STATUSES } from "@/features/piano/types";
+import { isYoutubeUrl } from "@/features/piano/services/youtube-transcript";
 
 const optionalHttpUrl = z
   .string()
@@ -9,6 +10,15 @@ const optionalHttpUrl = z
     "URL must be http or https",
   )
   .optional();
+
+const youtubeUrl = z
+  .string()
+  .url()
+  .refine(
+    (u) => u.startsWith("http://") || u.startsWith("https://"),
+    "URL must be http or https",
+  )
+  .refine((u) => isYoutubeUrl(u), "URL must be a YouTube link");
 
 export const youtubeNoteSchema = z.object({
   id: z.string().min(1),
@@ -28,11 +38,17 @@ export const youtubeNoteSchema = z.object({
 
 export const createYoutubeNoteSchema = z
   .object({
-    rawText: z.string().min(1).max(20_000),
-    url: optionalHttpUrl,
+    rawText: z.string().max(20_000).optional(),
+    url: youtubeUrl.optional(),
     channelHint: z.string().max(120).optional(),
+    /** When true (default for URL imports), map note to today's plan after save. */
+    mapToPlan: z.boolean().optional(),
   })
-  .strict();
+  .strict()
+  .refine(
+    (data) => Boolean(data.rawText?.trim()) || Boolean(data.url?.trim()),
+    { message: "Provide a YouTube URL or pasted notes (or both)." },
+  );
 
 export const patchYoutubeNoteSchema = z
   .object({

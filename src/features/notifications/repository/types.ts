@@ -10,6 +10,9 @@ export interface NotificationRepository {
     userId: string,
     patch: PatchNotificationPreferencesInput & {
       lastDigestSentOn?: string | null;
+      pianoTipsSentOn?: string | null;
+      pianoTipsSentCount?: number;
+      lastPianoTipSentAt?: string | null;
     },
   ): Promise<NotificationPreferences>;
   listEnabledPreferences(): Promise<NotificationPreferences[]>;
